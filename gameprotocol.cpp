@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -714,6 +714,19 @@ BYTEARRAY CGameProtocol :: SEND_W3GS_GAMEINFO( bool TFT, unsigned char war3Versi
 
 	// DEBUG_Print( "SENT W3GS_GAMEINFO" );
 	// DEBUG_Print( packet );
+	return packet;
+}
+
+BYTEARRAY CGameProtocol :: SEND_CUSTOM_GAMELIST( string username, string gamename, string owner, uint32_t slotsTaken, uint32_t slotsTotal )
+{
+	BYTEARRAY packet;
+	packet.push_back( 3 );
+	packet.push_back( 4 );
+	UTIL_AppendByteArrayFast( packet, username );
+	UTIL_AppendByteArrayFast( packet, gamename );
+	UTIL_AppendByteArrayFast( packet, owner );
+	UTIL_AppendByteArray( packet, slotsTaken, false );
+	UTIL_AppendByteArray( packet, slotsTotal, false );
 	return packet;
 }
 

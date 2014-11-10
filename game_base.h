@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -47,6 +47,7 @@ class CCallableScoreCheck;
 class CCallableLeagueCheck;
 class CCallableConnectCheck;
 struct QueuedSpoofAdd;
+struct FakePlayer;
 
 class CBaseGame
 {
@@ -59,7 +60,6 @@ protected:
 	CTCPServer *m_Socket;							// listening socket
 	CGameProtocol *m_Protocol;						// game protocol
 	vector<CPotentialPlayer *> m_Potentials;		// vector of potential players (connections that haven't sent a W3GS_REQJOIN packet yet)
-	map<uint32_t, CPotentialPlayer*> m_BannedPlayers;
 	vector<CCallableScoreCheck *> m_ScoreChecks;
 	vector<CCallableLeagueCheck *> m_LeagueChecks;
 	vector<CCallableConnectCheck *> m_ConnectChecks;	// session validation for entconnect system
@@ -77,7 +77,6 @@ protected:
 	uint16_t m_HostPort;							// the port to host games on
 	unsigned char m_GameState;						// game state, public or private
 	unsigned char m_VirtualHostPID;					// virtual host's PID
-	unsigned char m_FakePlayerPID;					// the fake player's PID (if present)
 	unsigned char m_GProxyEmptyActions;
 	string m_GameName;								// game name
 	string m_LastGameName;							// last game name (the previous game name before it was rehosted)
@@ -126,6 +125,7 @@ protected:
 	bool m_SlotInfoChanged;							// if the slot info has changed and hasn't been sent to the players yet (optimization)
 	bool m_Locked;									// if the game owner is the only one allowed to run game commands or not
 	bool m_RefreshMessages;							// if we should display "game refreshed..." messages or not
+	uint32_t m_RefreshErrorTicks;					// GetTicks( ) when m_RefreshError is set to true
 	bool m_RefreshError;							// if there was an error refreshing the game
 	bool m_RefreshRehosted;							// if we just rehosted and are waiting for confirmation that it was successful
 	bool m_MuteAll;									// if we should stop forwarding ingame chat messages targeted for all players or not
@@ -139,6 +139,7 @@ protected:
 	bool m_MatchMaking;								// if matchmaking mode is enabled
 	bool m_LocalAdminMessages;						// if local admin messages should be relayed or not
 	bool m_SoftGameOver;							// whether the game is soft ended
+	bool m_AllowDownloads;
     uint32_t m_DatabaseID;                          // the ID number from the database, which we'll use to save replay
 	int m_DoDelete;									// notifies thread to exit
 	uint32_t m_LastReconnectHandleTime;				// last time we tried to handle GProxy reconnects
@@ -146,7 +147,7 @@ protected:
 	bool m_Tournament;								// whether or not this is a uxtourney system game
 	uint32_t m_TournamentMatchID;					// if m_Tournament, this is the tournament match ID
 	uint32_t m_TournamentChatID;					// if m_Tournament, this is the chat id
-	string m_FakePlayerName;						// fake player name, only will be different if tournament
+	vector<FakePlayer>  m_FakePlayers;				// vector of fake players
 
 public:
 	vector<string> m_DoSayGames;					// vector of strings we should announce to the current game
@@ -170,6 +171,7 @@ public:
 	virtual unsigned char GetGProxyEmptyActions( )	{ return m_GProxyEmptyActions; }
 	virtual string GetGameName( )					{ return m_GameName; }
 	virtual string GetMapName( )					{ return m_MapName; }
+	virtual CMap* GetMap( )							{ return m_Map; }
 	virtual string GetLastGameName( )				{ return m_LastGameName; }
 	virtual string GetVirtualHostName( )			{ return m_VirtualHostName; }
 	virtual string GetOwnerName( )					{ return m_OwnerName; }
@@ -191,7 +193,7 @@ public:
 	virtual void SetAutoStartPlayers( uint32_t nAutoStartPlayers )		{ m_AutoStartPlayers = nAutoStartPlayers; }
 	virtual void SetMinimumScore( double nMinimumScore )				{ m_MinimumScore = nMinimumScore; }
 	virtual void SetMaximumScore( double nMaximumScore )				{ m_MaximumScore = nMaximumScore; }
-	virtual void SetRefreshError( bool nRefreshError )					{ m_RefreshError = nRefreshError; }
+	virtual void SetRefreshError( bool nRefreshError )					{ m_RefreshError = nRefreshError; m_RefreshErrorTicks = GetTicks( ); }
 	virtual void SetMatchMaking( bool nMatchMaking )					{ m_MatchMaking = nMatchMaking; }
 
 	virtual uint32_t GetNextTimedActionTicks( );
@@ -232,7 +234,6 @@ public:
 	virtual void SendAllActions( );
 	virtual void SendWelcomeMessage( CGamePlayer *player );
 	virtual void SendEndMessage( );
-	virtual void SendBannedInfo( CPotentialPlayer *player, CDBBan *Ban );
 
 	// events
 	// note: these are only called while iterating through the m_Potentials or m_Players vectors
@@ -303,10 +304,11 @@ public:
 	virtual void StopLaggers( string reason );
 	virtual void CreateVirtualHost( );
 	virtual void DeleteVirtualHost( );
-	virtual void CreateFakePlayer( );
-	virtual void CreateFakePlayer( unsigned char SID );
+	virtual void CreateFakePlayer( string name = "" );
+	virtual void CreateFakePlayer( unsigned char SID, string name = "" );
 	virtual void DeleteFakePlayer( );
 	virtual void ShowTeamScores( );
+	virtual string GetJoinedRealm( uint32_t hostcounter );
 };
 
 struct QueuedSpoofAdd {
@@ -314,6 +316,11 @@ struct QueuedSpoofAdd {
 	string name;
 	bool sendMessage;
 	string failMessage; //empty if no failure
+};
+
+struct FakePlayer {
+	unsigned char pid;
+	string name;
 };
 
 #endif

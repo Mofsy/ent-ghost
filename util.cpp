@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -640,6 +640,22 @@ void UTIL_Replace( string &Text, string Key, string Value )
 		Text.replace( KeyStart, Key.size( ), Value );
 		KeyStart = Text.find( Key );
 	}
+}
+
+vector<string> UTIL_Split( string &s, char delim, vector<string> &elems ) {
+    stringstream ss(s);
+    string item;
+    while( getline( ss, item, delim ) ) {
+        elems.push_back( item );
+    }
+    return elems;
+}
+
+
+std::vector<std::string> UTIL_Split( string &s, char delim ) {
+    vector<string> elems;
+    UTIL_Split( s, delim, elems );
+    return elems;
 }
 
 vector<string> UTIL_Tokenize( string s, char delim )

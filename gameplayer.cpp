@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -34,13 +34,14 @@
 #include "gameprotocol.h"
 #include "gcbiprotocol.h"
 #include "gpsprotocol.h"
+#include "ghostdb.h"
 #include "game_base.h"
 
 //
 // CPotentialPlayer
 //
 
-CPotentialPlayer :: CPotentialPlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket ) : m_Protocol( nProtocol ), m_Game( nGame ), m_Socket( nSocket ), m_DeleteMe( false ), m_Error( false ), m_IncomingJoinPlayer( NULL ), m_IncomingGarenaUser( NULL ), m_ConnectionState( 0 ), m_ConnectionTime( GetTicks( ) ), m_Banned( false )
+CPotentialPlayer :: CPotentialPlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket ) : m_Protocol( nProtocol ), m_Game( nGame ), m_Socket( nSocket ), m_DeleteMe( false ), m_Error( false ), m_IncomingJoinPlayer( NULL ), m_IncomingGarenaUser( NULL ), m_ConnectionState( 0 ), m_ConnectionTime( GetTicks( ) ), m_Banned( false ), m_CallableBanCheck( NULL )
 {
 	if( nSocket )
 		m_CachedIP = nSocket->GetIPString( );
@@ -61,6 +62,13 @@ CPotentialPlayer :: ~CPotentialPlayer( )
 
 	delete m_IncomingJoinPlayer;
 	delete m_IncomingGarenaUser;
+	
+	boost::mutex::scoped_lock lock( m_Game->m_GHost->m_CallablesMutex );
+
+	if( m_CallableBanCheck )
+		m_Game->m_GHost->m_Callables.push_back( m_CallableBanCheck );
+
+	lock.unlock( );
 }
 
 BYTEARRAY CPotentialPlayer :: GetGarenaIP( )
@@ -123,6 +131,40 @@ bool CPotentialPlayer :: Update( void *fd )
 		CONSOLE_Print( "[DENY] Kicking player: REQJOIN not received within five seconds" );
 		m_DeleteMe = true;
         m_Game->m_GHost->DenyIP( GetExternalIPString( ), 60000, "REQJOIN not received within five seconds" );
+	}
+	
+	else if( m_ConnectionState == 0 && GetTicks( ) - m_ConnectionTime > 30000 )
+	{
+		m_DeleteMe = true;
+        m_Game->m_GHost->DenyIP( GetExternalIPString( ), 30000, "banned player message" );
+	}
+	
+	// request join if we're ready or if ban check is taking too long
+	if( m_ConnectionState == 0 && m_CallableBanCheck && ( m_CallableBanCheck->GetReady( ) || GetTicks( ) - m_ConnectionTime > 2000 ) )
+	{
+		CDBBan *Ban = m_CallableBanCheck->GetResult( );
+		
+		if( Ban )
+		{
+			m_Banned = true;
+			SendBannedInfo( Ban, "banned" );
+		}
+		else
+			m_Game->EventPlayerJoined( this, m_IncomingJoinPlayer, NULL );
+
+		if( m_CallableBanCheck->GetReady( ) )
+		{
+			m_Game->m_GHost->m_DB->RecoverCallable( m_CallableBanCheck );
+			delete m_CallableBanCheck; //deletes Ban too
+		}
+		else
+		{
+			boost::mutex::scoped_lock lock( m_Game->m_GHost->m_CallablesMutex );
+			m_Game->m_GHost->m_Callables.push_back( m_CallableBanCheck );
+			lock.unlock( );
+		}
+
+		m_CallableBanCheck = NULL;
 	}
 
 	// don't call DoSend here because some other players may not have updated yet and may generate a packet for this player
@@ -201,7 +243,10 @@ void CPotentialPlayer :: ProcessPackets( )
 				m_IncomingJoinPlayer = m_Protocol->RECEIVE_W3GS_REQJOIN( Packet->GetData( ) );
 
 				if( m_IncomingJoinPlayer && !m_Banned )
-					m_Game->EventPlayerJoined( this, m_IncomingJoinPlayer, NULL );
+				{
+					// check for bans on this player
+					m_CallableBanCheck = m_Game->m_GHost->m_DB->ThreadedBanCheck( m_Game->GetJoinedRealm( m_IncomingJoinPlayer->GetHostCounter( ) ), m_IncomingJoinPlayer->GetName( ), GetExternalIPString( ), m_Game->m_GHost->HostNameLookup( GetExternalIPString( ) ), m_Game->GetOwnerName( ) );
+				}
 
 				// don't continue looping because there may be more packets waiting and this parent class doesn't handle them
 				// EventPlayerJoined creates the new player, NULLs the socket, and sets the delete flag on this object so it'll be deleted shortly
@@ -232,35 +277,66 @@ void CPotentialPlayer :: Send( BYTEARRAY data )
 		m_Socket->PutBytes( data );
 }
 
+void CPotentialPlayer :: SendBannedInfo( CDBBan *Ban, string type )
+{
+	// send slot info to the banned player
+	
+	CMap *Map = m_Game->GetMap( );
+	
+	if( Map )
+	{
+		vector<CGameSlot> Slots = Map->GetSlots( );
+		m_Socket->PutBytes( m_Protocol->SEND_W3GS_SLOTINFOJOIN( 2, m_Socket->GetPort( ), GetExternalIP( ), Slots, 0, Map->GetMapGameType( ) == GAMETYPE_CUSTOM ? 3 : 0, Map->GetMapNumPlayers( ) ) );
+	
+		BYTEARRAY IP;
+		IP.push_back( 0 );
+		IP.push_back( 0 );
+		IP.push_back( 0 );
+		IP.push_back( 0 );
+	
+		m_Socket->PutBytes( m_Protocol->SEND_W3GS_PLAYERINFO( 1, "BANNED", IP, IP ) );
+	
+		// send a map check packet to the new player
+	
+		m_Socket->PutBytes( m_Protocol->SEND_W3GS_MAPCHECK( Map->GetMapPath( ), Map->GetMapSize( ), Map->GetMapInfo( ), Map->GetMapCRC( ), Map->GetMapSHA1( ) ) );
+	
+		if(type == "banned")
+		{
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "Sorry, but you are currently banned." ) );
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "    Username: " + Ban->GetName( ) ) );
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "    Admin: " + Ban->GetAdmin( ) ) );
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "    Reason: " + Ban->GetReason( ) ) );
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "    Gamename: " + Ban->GetGameName( ) ) );
+		}
+		else if(type == "score") {
+			m_Socket->PutBytes( m_Protocol->SEND_W3GS_CHAT_FROM_HOST( 1, UTIL_CreateByteArray( 2 ), 16, BYTEARRAY( ), "Error: you do not have the required score or number of wins to join this game." ) );
+		}
+	}
+}
+
 //
 // CGamePlayer
 //
 
-CGamePlayer :: CGamePlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved ) : CPotentialPlayer( nProtocol, nGame, nSocket ),
-                                                                                                                                                                                              m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 0 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_LoginAttempts( 0 ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ),
-                                                                                                                                                                                              m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ),
-m_LoggedIn( false ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ),
-                                                                                                                                                                                              m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false )
+CGamePlayer :: CGamePlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved ) : CPotentialPlayer( nProtocol, nGame, nSocket ), m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 0 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ), m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ), m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false ), m_NoLag( false )
 {
     m_ConnectionState = 1;
 }
 
-CGamePlayer :: CGamePlayer( CPotentialPlayer *potential, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved ) : CPotentialPlayer( potential->m_Protocol, potential->m_Game, potential->GetSocket( ) ),
-                                                                                                                                                          m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 1 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_Cookies( 0 ), m_LoginAttempts( 0 ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ),
-                                                                                                                                                          m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ),
-m_LoggedIn( false ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ),
-                                                                                                                                                          m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false )
+CGamePlayer :: CGamePlayer( CPotentialPlayer *potential, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved ) : CPotentialPlayer( potential->m_Protocol, potential->m_Game, potential->GetSocket( ) ), m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 1 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_Cookies( 0 ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ), m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ), m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false ), m_NoLag( false )
 {
 	// todotodo: properly copy queued packets to the new player, this just discards them
 	// this isn't a big problem because official Warcraft III clients don't send any packets after the join request until they receive a response
 	// m_Packets = potential->GetPackets( );
 
 
-        // hackhack: we initialize m_TotalPacketsReceived to 1 because the CPotentialPlayer must have received a W3GS_REQJOIN before this class was created
+	// hackhack: we initialize m_TotalPacketsReceived to 1 because the CPotentialPlayer must have received a W3GS_REQJOIN before this class was created
 	// to fix this we could move the packet counters to CPotentialPlayer and copy them here
 	// note: we must make sure we never send a packet to a CPotentialPlayer otherwise the send counter will be incorrect too! what a mess this is...
 	// that said, the packet counters are only used for managing GProxy++ reconnections
     m_ConnectionState = 1;
+    
+    m_IncomingGarenaUser = potential->GetGarenaUser( );
 }
 
 CGamePlayer :: ~CGamePlayer( )
@@ -391,20 +467,11 @@ bool CGamePlayer :: Update( void *fd )
 	
 	// disconnect if the player is downloading too slowly
 	
-    if( m_DownloadStarted && !m_DownloadFinished && !m_Game->GetGameLoaded() && !m_Game->GetGameLoading() )
+    if( m_DownloadStarted && !m_DownloadFinished && !m_Game->GetGameLoaded() && !m_Game->GetGameLoading() && GetLastMapPartSent( ) > 0 )
 	{
 		uint32_t downloadingTime = GetTicks( ) - m_StartedDownloadingTicks;
 		
-		if( false && downloadingTime > 90000 )
-		{
-			CONSOLE_Print( "[DENY] Kicking player: download time too long" );
-			m_DeleteMe = true;
-            SetLeftReason( "download time too long" );
-            SetLeftCode( PLAYERLEAVE_LOBBY );
-            m_Game->OpenSlot( m_Game->GetSIDFromPID( GetPID( ) ), false );
-		}
-		
-		else if( false && downloadingTime > 3000 && GetLastMapPartAcked( ) / downloadingTime < 10 ) // GetLastMapPartAcked( ) / downloadingTime is B/ms, approximately KB/sec
+		if( downloadingTime > 8000 && GetLastMapPartAcked( ) / downloadingTime < 10 ) // GetLastMapPartAcked( ) / downloadingTime is B/ms, approximately KB/sec
 		{
 			CONSOLE_Print( "[DENY] Kicking player: download speed too low" );
 			m_DeleteMe = true;

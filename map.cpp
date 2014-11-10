@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -806,6 +806,14 @@ void CMap :: Load( CConfig *CFG, string nCFGFile )
 			uint32_t CurrentSlot = CFG->GetInt( "map_tournamentlayout" + UTIL_ToString( i ), 12 );
 			m_TournamentLayout.push_back( CurrentSlot );
 		}
+	}
+	
+	for( int i = 0; i <= 12; i++ )
+	{
+		uint32_t CurrentSlot = CFG->GetInt( "map_fakeplayer" + UTIL_ToString( i ), 255 );
+
+		if( CurrentSlot != 255 )
+			m_FakePlayers.push_back( CurrentSlot );
 	}
 	
 	m_Conditions = CFG->GetString( "map_conditions", string( ) );

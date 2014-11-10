@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -40,10 +40,7 @@ class CCallableBanCount;
 class CCallableBanCheck;
 class CCallableBanAdd;
 class CCallableBanRemove;
-class CCallableBanList;
-class CCallableWhiteList;
 class CCallableSpoofList;
-class CCallableBanListFast;
 class CCallableReconUpdate;
 class CCallableCommandList;
 class CCallableGameAdd;
@@ -107,14 +104,11 @@ public:
 	virtual bool AdminRemove( string server, string user );
 	virtual vector<string> AdminList( string server );
 	virtual uint32_t BanCount( string server );
-	virtual CDBBan *BanCheck( string server, string user, string ip );
+	virtual CDBBan *BanCheck( string server, string user, string ip, string hostname, string ownername );
 	virtual uint32_t BanAdd( string server, string user, string ip, string gamename, string admin, string reason, uint32_t expiretime, string context );
 	virtual bool BanRemove( string server, string user, string context );
 	virtual bool BanRemove( string user, string context );
-	virtual vector<CDBBan *> BanList( string server );
-	virtual vector<string> WhiteList( );
 	virtual map<string, string> SpoofList( );
-	virtual vector<CDBBan *> BanListFast( string server, uint32_t banlistfasttime );
 	virtual void ReconUpdate( uint32_t hostcounter, uint32_t seconds );
 	virtual vector<string> CommandList(  );
 	virtual uint32_t GameAdd( string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype );
@@ -148,14 +142,11 @@ public:
 	virtual CCallableAdminRemove *ThreadedAdminRemove( string server, string user );
 	virtual CCallableAdminList *ThreadedAdminList( string server );
 	virtual CCallableBanCount *ThreadedBanCount( string server );
-	virtual CCallableBanCheck *ThreadedBanCheck( string server, string user, string ip );
+	virtual CCallableBanCheck *ThreadedBanCheck( string server, string user, string ip, string hostname, string ownername );
 	virtual CCallableBanAdd *ThreadedBanAdd( string server, string user, string ip, string gamename, string admin, string reason, uint32_t expiretime, string context );
 	virtual CCallableBanRemove *ThreadedBanRemove( string server, string user, string context );
 	virtual CCallableBanRemove *ThreadedBanRemove( string user, string context );
-	virtual CCallableBanList *ThreadedBanList( string server );
-	virtual CCallableWhiteList *ThreadedWhiteList( );
 	virtual CCallableSpoofList *ThreadedSpoofList( );
-	virtual CCallableBanListFast *ThreadedBanListFast( string server, uint32_t banlistfasttime );
 	virtual CCallableReconUpdate *ThreadedReconUpdate( uint32_t hostcounter, uint32_t seconds );
 	virtual CCallableCommandList *ThreadedCommandList( );
 	virtual CCallableGameAdd *ThreadedGameAdd( string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype );
@@ -330,15 +321,19 @@ protected:
 	string m_Server;
 	string m_User;
 	string m_IP;
+	string m_HostName;
+	string m_OwnerName;
 	CDBBan *m_Result;
 
 public:
-	CCallableBanCheck( string nServer, string nUser, string nIP ) : CBaseCallable( ), m_Server( nServer ), m_User( nUser ), m_IP( nIP ), m_Result( NULL ) { }
+	CCallableBanCheck( string nServer, string nUser, string nIP, string nHostName, string nOwnerName ) : CBaseCallable( ), m_Server( nServer ), m_User( nUser ), m_IP( nIP ), m_HostName( nHostName ), m_OwnerName( nOwnerName ), m_Result( NULL ) { }
 	virtual ~CCallableBanCheck( );
 
 	virtual string GetServer( )					{ return m_Server; }
 	virtual string GetUser( )					{ return m_User; }
 	virtual string GetIP( )						{ return m_IP; }
+	virtual string GetHostName( )				{ return m_HostName; }
+	virtual string GetOwnerName( )				{ return m_OwnerName; }
 	virtual CDBBan *GetResult( )				{ return m_Result; }
 	virtual void SetResult( CDBBan *nResult )	{ m_Result = nResult; }
 };
@@ -391,33 +386,6 @@ public:
 	virtual void SetResult( bool nResult )	{ m_Result = nResult; }
 };
 
-class CCallableBanList : virtual public CBaseCallable
-{
-protected:
-	string m_Server;
-	vector<CDBBan *> m_Result;
-
-public:
-	CCallableBanList( string nServer ) : CBaseCallable( ), m_Server( nServer ) { }
-	virtual ~CCallableBanList( );
-
-	virtual vector<CDBBan *> GetResult( )				{ return m_Result; }
-	virtual void SetResult( vector<CDBBan *> nResult )	{ m_Result = nResult; }
-};
-
-class CCallableWhiteList : virtual public CBaseCallable
-{
-protected:
-	vector<string> m_Result;
-
-public:
-	CCallableWhiteList( ) : CBaseCallable( ) { }
-	virtual ~CCallableWhiteList( );
-
-	virtual vector<string> GetResult( )				{ return m_Result; }
-	virtual void SetResult( vector<string> nResult )	{ m_Result = nResult; }
-};
-
 class CCallableSpoofList : virtual public CBaseCallable
 {
 protected:
@@ -442,21 +410,6 @@ public:
 
 	virtual vector<string> GetResult( )				{ return m_Result; }
 	virtual void SetResult( vector<string> nResult )	{ m_Result = nResult; }
-};
-
-class CCallableBanListFast : virtual public CBaseCallable
-{
-protected:
-	string m_Server;
-	uint32_t m_BanListFastTime;
-	vector<CDBBan *> m_Result;
-
-public:
-	CCallableBanListFast( string nServer, uint32_t nBanListFastTime ) : CBaseCallable( ), m_Server( nServer ), m_BanListFastTime( nBanListFastTime ) { }
-	virtual ~CCallableBanListFast( );
-
-	virtual vector<CDBBan *> GetResult( )				{ return m_Result; }
-	virtual void SetResult( vector<CDBBan *> nResult )	{ m_Result = nResult; }
 };
 
 class CCallableReconUpdate : virtual public CBaseCallable
@@ -1313,9 +1266,10 @@ private:
 	uint32_t m_TotalWins;			// total number of dota games won
 	uint32_t m_TotalLosses;			// total number of dota games lost
 	double m_Score;
+	uint32_t m_Rank;
 
 public:
-	CDBW3MMDPlayerSummary( string nServer, string nName, string nCategory, uint32_t nTotalGames, uint32_t nTotalWins, uint32_t nTotalLosses, double nScore );
+	CDBW3MMDPlayerSummary( string nServer, string nName, string nCategory, uint32_t nTotalGames, uint32_t nTotalWins, uint32_t nTotalLosses, double nScore, uint32_t m_Rank );
 	~CDBW3MMDPlayerSummary( );
 
 	string GetServer( )					{ return m_Server; }
@@ -1325,6 +1279,7 @@ public:
 	uint32_t GetTotalWins( )			{ return m_TotalWins; }
 	uint32_t GetTotalLosses( )			{ return m_TotalLosses; }
 	double GetScore( )					{ return m_Score; }
+	int GetRank( )						{ return m_Rank; }
 };
 
 #endif

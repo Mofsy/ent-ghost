@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -43,10 +43,12 @@
 #include <algorithm>
 #include <map>
 #include <queue>
+#include <deque>
 #include <set>
 #include <string>
 #include <vector>
 #include <boost/thread.hpp>
+#include <GeoIP.h>
 
 using namespace std;
 

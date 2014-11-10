@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -56,6 +56,7 @@ public:
 	virtual bool ProcessAction( CIncomingAction *Action );
 	virtual void Save( CGHost *GHost, CGHostDB *DB, uint32_t GameID );
 	virtual vector<string> TokenizeKey( string key );
+	virtual bool IsWinner( );
 	virtual void SetWinner( uint32_t nWinner );
 };
 
