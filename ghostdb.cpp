@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -125,7 +125,7 @@ map<string, string> CGHostDB :: SpoofList( )
 
 vector<CDBBan *> CGHostDB :: BanListFast( string server, uint32_t banlistfasttime )
 {
-
+	return vector<CDBBan *>( );
 }
 
 void CGHostDB :: ReconUpdate( uint32_t hostcounter, uint32_t seconds )

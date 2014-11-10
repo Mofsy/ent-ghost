@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -48,7 +48,7 @@
 // CBaseGame
 //
 
-CBaseGame :: CBaseGame( CGHost *nGHost, CMap *nMap, CSaveGame *nSaveGame, uint16_t nHostPort, unsigned char nGameState, string nGameName, string nOwnerName, string nCreatorName, string nCreatorServer ) : m_GHost( nGHost ), m_SaveGame( nSaveGame ), m_Replay( NULL ), m_Exiting( false ), m_Saving( false ), m_HostPort( nHostPort ), m_GameState( nGameState ), m_VirtualHostPID( 255 ), m_FakePlayerPID( 255 ), m_GProxyEmptyActions( 0 ), m_GameName( nGameName ), m_LastGameName( nGameName ), m_VirtualHostName( m_GHost->m_VirtualHostName ), m_OwnerName( nOwnerName ), m_CreatorName( nCreatorName ), m_CreatorServer( nCreatorServer ), m_HCLCommandString( nMap->GetMapDefaultHCL( ) ), m_RandomSeed( GetTicks( ) ), m_HostCounter( m_GHost->m_HostCounter++ ), m_EntryKey( rand( ) ), m_Latency( m_GHost->m_Latency ), m_SyncLimit( m_GHost->m_SyncLimit ), m_SyncCounter( 0 ), m_GameTicks( 0 ), m_CreationTime( GetTime( ) ), m_LastPingTime( GetTime( ) ), m_LastRefreshTime( GetTime( ) ), m_LastDownloadTicks( GetTime( ) ), m_DownloadCounter( 0 ), m_LastDownloadCounterResetTicks( GetTime( ) ), m_LastAnnounceTime( 0 ), m_AnnounceInterval( 0 ), m_LastAutoStartTime( GetTime( ) ), m_AutoStartPlayers( 0 ), m_LastCountDownTicks( 0 ), m_CountDownCounter( 0 ), m_StartedLoadingTicks( 0 ), m_StartPlayers( 0 ), m_LastLagScreenResetTime( 0 ), m_LastActionSentTicks( 0 ), m_LastActionLateBy( 0 ), m_StartedLaggingTime( 0 ), m_LastLagScreenTime( 0 ), m_LastReservedSeen( GetTime( ) ), m_StartedKickVoteTime( 0 ), m_StartedVoteStartTime( 0 ), m_GameOverTime( 0 ), m_LastPlayerLeaveTicks( 0 ), m_MinimumScore( 0. ), m_MaximumScore( 0. ), m_SlotInfoChanged( false ), m_Locked( false ), m_RefreshMessages( m_GHost->m_RefreshMessages ), m_RefreshError( false ), m_RefreshRehosted( false ), m_MuteAll( false ), m_MuteLobby( false ), m_CountDownStarted( false ), m_GameLoading( false ), m_GameLoaded( false ), m_LoadInGame( nMap->GetMapLoadInGame( ) ), m_Lagging( false ), m_AutoSave( m_GHost->m_AutoSave ), m_MatchMaking( false ), m_LocalAdminMessages( m_GHost->m_LocalAdminMessages ), m_DoDelete( 0 ), m_LastReconnectHandleTime( 0 ), m_League( false ), m_Tournament( false ), m_TournamentMatchID( 0 ), m_TournamentChatID( 0 ), m_FakePlayerName( "FakePlayer" ), m_SoftGameOver( false )
+CBaseGame :: CBaseGame( CGHost *nGHost, CMap *nMap, CSaveGame *nSaveGame, uint16_t nHostPort, unsigned char nGameState, string nGameName, string nOwnerName, string nCreatorName, string nCreatorServer ) : m_GHost( nGHost ), m_SaveGame( nSaveGame ), m_Replay( NULL ), m_Exiting( false ), m_Saving( false ), m_HostPort( nHostPort ), m_GameState( nGameState ), m_VirtualHostPID( 255 ), m_FakePlayerPID( 255 ), m_GProxyEmptyActions( 0 ), m_GameName( nGameName ), m_LastGameName( nGameName ), m_VirtualHostName( m_GHost->m_VirtualHostName ), m_OwnerName( nOwnerName ), m_CreatorName( nCreatorName ), m_CreatorServer( nCreatorServer ), m_HCLCommandString( nMap->GetMapDefaultHCL( ) ), m_RandomSeed( GetTicks( ) ), m_HostCounter( m_GHost->m_HostCounter++ ), m_EntryKey( rand( ) ), m_Latency( m_GHost->m_Latency ), m_SyncLimit( m_GHost->m_SyncLimit ), m_SyncCounter( 0 ), m_GameTicks( 0 ), m_CreationTime( GetTime( ) ), m_LastPingTime( GetTime( ) ), m_LastRefreshTime( GetTime( ) ), m_LastDownloadTicks( GetTime( ) ), m_DownloadCounter( 0 ), m_LastDownloadCounterResetTicks( GetTime( ) ), m_LastAnnounceTime( 0 ), m_AnnounceInterval( 0 ), m_LastAutoStartTime( GetTime( ) ), m_AutoStartPlayers( 0 ), m_LastCountDownTicks( 0 ), m_CountDownCounter( 0 ), m_StartedLoadingTicks( 0 ), m_StartPlayers( 0 ), m_LastLagScreenResetTime( 0 ), m_LastActionSentTicks( 0 ), m_LastActionLateBy( 0 ), m_StartedLaggingTime( 0 ), m_LastLagScreenTime( 0 ), m_LastReservedSeen( GetTime( ) ), m_StartedKickVoteTime( 0 ), m_StartedVoteStartTime( 0 ), m_GameOverTime( 0 ), m_LastPlayerLeaveTicks( 0 ), m_MinimumScore( 0. ), m_MaximumScore( 0. ), m_SlotInfoChanged( false ), m_Locked( false ), m_RefreshMessages( m_GHost->m_RefreshMessages ), m_RefreshError( false ), m_RefreshRehosted( false ), m_MuteAll( false ), m_MuteLobby( false ), m_CountDownStarted( false ), m_GameLoading( false ), m_GameLoaded( false ), m_LoadInGame( nMap->GetMapLoadInGame( ) ), m_Lagging( false ), m_AutoSave( m_GHost->m_AutoSave ), m_MatchMaking( false ), m_LocalAdminMessages( m_GHost->m_LocalAdminMessages ), m_DoDelete( 0 ), m_LastReconnectHandleTime( 0 ), m_League( false ), m_Tournament( false ), m_TournamentMatchID( 0 ), m_TournamentChatID( 0 ), m_FakePlayerName( "FakePlayer" ), m_SoftGameOver( false ), m_AllowDownloads( true )
 {
 	m_Socket = new CTCPServer( );
 	m_Protocol = new CGameProtocol( m_GHost );
@@ -662,13 +662,13 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 
 	// auto rehost if there was a refresh error in autohosted games
 
-	if( m_RefreshError && !m_CountDownStarted && m_GameState == GAME_PUBLIC && !m_GHost->m_AutoHostGameName.empty( ) && m_GHost->m_AutoHostMaximumGames != 0 && m_GHost->m_AutoHostAutoStartPlayers != 0 && m_AutoStartPlayers != 0 )
+	if( m_RefreshError && !m_CountDownStarted && m_GameState == GAME_PUBLIC && !m_GHost->m_AutoHostGameName.empty( ) && m_GHost->m_AutoHostMaximumGames != 0 && m_GHost->m_AutoHostAutoStartPlayers != 0 && m_AutoStartPlayers != 0 && GetTicks( ) - m_RefreshErrorTicks > 10000 )
 	{
 		// there's a slim chance that this isn't actually an autohosted game since there is no explicit autohost flag
 		// however, if autohosting is enabled and this game is public and this game is set to autostart, it's probably autohosted
 		// so rehost it using the current autohost game name
 
-		string GameName = m_GHost->m_AutoHostGameName + " #" + UTIL_ToString( m_GHost->m_HostCounter );
+		string GameName = m_GHost->m_AutoHostGameName + " #" + UTIL_ToString( m_GHost->m_HostCounter % 100 );
 		CONSOLE_Print( "[GAME: " + m_GameName + "] automatically trying to rehost as public game [" + GameName + "] due to refresh failure" );
 		
 		//need to synchronize here because we're using host counter variable from GHost
@@ -708,7 +708,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 
 			if( (*i)->GetOutPacketsQueued( ) <= 1 )
 			{
-				(*i)->QueueGameRefresh( m_GameState, m_GameName, string( ), m_Map, m_SaveGame, 0, m_HostCounter );
+				(*i)->QueueGameRefresh( m_GameState, m_GameName, string( ), m_Map, m_SaveGame, 1, m_HostCounter );
 				Refreshed = true;
 			}
 		}
@@ -1038,7 +1038,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 
 			for( vector<CGamePlayer *> :: iterator i = m_Players.begin( ); i != m_Players.end( ); ++i )
 			{
-				if( m_SyncCounter - (*i)->GetSyncCounter( ) > m_SyncLimit )
+				if( m_SyncCounter - (*i)->GetSyncCounter( ) > m_SyncLimit && !(*i)->GetNoLag( ) )
 				{
 					// drop them immediately if they have already exceeded their total lagging time (5 minutes)
 					if( (*i)->GetTotalLaggingTicks( ) > 300000 )
@@ -3149,9 +3149,6 @@ void CBaseGame :: EventPlayerChangeRace( CGamePlayer *player, unsigned char race
 	if( m_SaveGame )
 		return;
 
-	if( m_Map->GetMapOptions( ) & MAPOPT_FIXEDPLAYERSETTINGS )
-		return;
-
 	if( m_Map->GetMapFlags( ) & MAPFLAG_RANDOMRACES )
 		return;
 
@@ -3162,6 +3159,9 @@ void CBaseGame :: EventPlayerChangeRace( CGamePlayer *player, unsigned char race
 
 	if( SID < m_Slots.size( ) )
 	{
+		if( ( m_Map->GetMapOptions( ) & MAPOPT_FIXEDPLAYERSETTINGS ) && !( m_Slots[SID].GetRace( ) & SLOTRACE_SELECTABLE ) )
+			return;
+
 		m_Slots[SID].SetRace( race | SLOTRACE_SELECTABLE );
 		SendAllSlotInfo( );
 	}
@@ -3226,7 +3226,7 @@ void CBaseGame :: EventPlayerMapSize( CGamePlayer *player, CIncomingMapSize *map
 	{
 		// the player doesn't have the map
 
-		if( m_GHost->m_AllowDownloads != 0 )
+		if( m_GHost->m_AllowDownloads != 0 && m_AllowDownloads )
 		{
 			string *MapData = m_Map->GetMapData( );
 
@@ -3522,11 +3522,6 @@ void CBaseGame :: EventGameStarted( )
 	StatString = UTIL_EncodeStatString( StatString );
 	m_StatString = string( StatString.begin( ), StatString.end( ) );
 
-	// delete the map data
-
-	delete m_Map;
-	m_Map = NULL;
-
 	if( m_LoadInGame )
 	{
 		// buffer all the player loaded messages
@@ -3540,9 +3535,16 @@ void CBaseGame :: EventGameStarted( )
 		}
 	}
 
-	// move the game to the games in progress vector
+	// delete the map data
+	// we begin the games-mutex-synchronized segment here
+	// (map data has to be synchronized due to GetMapName calls)
 
 	boost::mutex::scoped_lock lock( m_GHost->m_GamesMutex );
+	delete m_Map;
+	m_Map = NULL;
+
+	// move the game to the games in progress vector
+
 	m_GHost->m_CurrentGame = NULL;
 	m_GHost->m_Games.push_back( this );
 	lock.unlock( );

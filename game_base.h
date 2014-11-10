@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -125,6 +125,7 @@ protected:
 	bool m_SlotInfoChanged;							// if the slot info has changed and hasn't been sent to the players yet (optimization)
 	bool m_Locked;									// if the game owner is the only one allowed to run game commands or not
 	bool m_RefreshMessages;							// if we should display "game refreshed..." messages or not
+	uint32_t m_RefreshErrorTicks;					// GetTicks( ) when m_RefreshError is set to true
 	bool m_RefreshError;							// if there was an error refreshing the game
 	bool m_RefreshRehosted;							// if we just rehosted and are waiting for confirmation that it was successful
 	bool m_MuteAll;									// if we should stop forwarding ingame chat messages targeted for all players or not
@@ -138,6 +139,7 @@ protected:
 	bool m_MatchMaking;								// if matchmaking mode is enabled
 	bool m_LocalAdminMessages;						// if local admin messages should be relayed or not
 	bool m_SoftGameOver;							// whether the game is soft ended
+	bool m_AllowDownloads;
     uint32_t m_DatabaseID;                          // the ID number from the database, which we'll use to save replay
 	int m_DoDelete;									// notifies thread to exit
 	uint32_t m_LastReconnectHandleTime;				// last time we tried to handle GProxy reconnects
@@ -190,7 +192,7 @@ public:
 	virtual void SetAutoStartPlayers( uint32_t nAutoStartPlayers )		{ m_AutoStartPlayers = nAutoStartPlayers; }
 	virtual void SetMinimumScore( double nMinimumScore )				{ m_MinimumScore = nMinimumScore; }
 	virtual void SetMaximumScore( double nMaximumScore )				{ m_MaximumScore = nMaximumScore; }
-	virtual void SetRefreshError( bool nRefreshError )					{ m_RefreshError = nRefreshError; }
+	virtual void SetRefreshError( bool nRefreshError )					{ m_RefreshError = nRefreshError; m_RefreshErrorTicks = GetTicks( ); }
 	virtual void SetMatchMaking( bool nMatchMaking )					{ m_MatchMaking = nMatchMaking; }
 
 	virtual uint32_t GetNextTimedActionTicks( );

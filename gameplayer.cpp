@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -240,7 +240,7 @@ CGamePlayer :: CGamePlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSock
                                                                                                                                                                                               m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 0 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_LoginAttempts( 0 ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ),
                                                                                                                                                                                               m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ),
 m_LoggedIn( false ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ),
-                                                                                                                                                                                              m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false )
+                                                                                                                                                                                              m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false ), m_NoLag( false )
 {
     m_ConnectionState = 1;
 }
@@ -249,7 +249,7 @@ CGamePlayer :: CGamePlayer( CPotentialPlayer *potential, unsigned char nPID, str
                                                                                                                                                           m_PID( nPID ), m_Name( nName ), m_InternalIP( nInternalIP ), m_JoinedRealm( nJoinedRealm ), m_TotalPacketsSent( 0 ), m_TotalPacketsReceived( 1 ), m_LeftCode( PLAYERLEAVE_LOBBY ), m_Cookies( 0 ), m_LoginAttempts( 0 ), m_SyncCounter( 0 ), m_JoinTime( GetTime( ) ),
                                                                                                                                                           m_LastMapPartSent( 0 ), m_LastMapPartAcked( 0 ), m_StartedDownloadingTicks( 0 ), m_FinishedLoadingTicks( 0 ), m_StartedLaggingTicks( 0 ), m_TotalLaggingTicks( 0 ), m_StatsSentTime( 0 ), m_StatsDotASentTime( 0 ), m_LastGProxyWaitNoticeSentTime( 0 ), m_Score( -100000.0 ),
 m_LoggedIn( false ), m_Spoofed( false ), m_Reserved( nReserved ), m_WhoisShouldBeSent( false ), m_WhoisSent( false ), m_DownloadAllowed( false ), m_DownloadStarted( false ), m_DownloadFinished( false ), m_FinishedLoading( false ), m_Lagging( false ),
-                                                                                                                                                          m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false )
+                                                                                                                                                          m_DropVote( false ), m_KickVote( false ), m_StartVote( false ), m_Muted( false ), m_LeftMessageSent( false ), m_GProxy( false ), m_GProxyDisconnectNoticeSent( false ), m_GProxyReconnectKey( rand( ) ), m_LastGProxyAckTime( 0 ), m_Autoban( false ), m_ForfeitVote( false ), m_FriendlyName( nName ), m_DrawVote( false ), m_NoLag( false )
 {
 	// todotodo: properly copy queued packets to the new player, this just discards them
 	// this isn't a big problem because official Warcraft III clients don't send any packets after the join request until they receive a response
@@ -391,20 +391,11 @@ bool CGamePlayer :: Update( void *fd )
 	
 	// disconnect if the player is downloading too slowly
 	
-    if( m_DownloadStarted && !m_DownloadFinished && !m_Game->GetGameLoaded() && !m_Game->GetGameLoading() )
+    if( m_DownloadStarted && !m_DownloadFinished && !m_Game->GetGameLoaded() && !m_Game->GetGameLoading() && GetLastMapPartSent( ) > 0 )
 	{
 		uint32_t downloadingTime = GetTicks( ) - m_StartedDownloadingTicks;
 		
-		if( false && downloadingTime > 90000 )
-		{
-			CONSOLE_Print( "[DENY] Kicking player: download time too long" );
-			m_DeleteMe = true;
-            SetLeftReason( "download time too long" );
-            SetLeftCode( PLAYERLEAVE_LOBBY );
-            m_Game->OpenSlot( m_Game->GetSIDFromPID( GetPID( ) ), false );
-		}
-		
-		else if( false && downloadingTime > 3000 && GetLastMapPartAcked( ) / downloadingTime < 10 ) // GetLastMapPartAcked( ) / downloadingTime is B/ms, approximately KB/sec
+		if( downloadingTime > 8000 && GetLastMapPartAcked( ) / downloadingTime < 10 ) // GetLastMapPartAcked( ) / downloadingTime is B/ms, approximately KB/sec
 		{
 			CONSOLE_Print( "[DENY] Kicking player: download speed too low" );
 			m_DeleteMe = true;
