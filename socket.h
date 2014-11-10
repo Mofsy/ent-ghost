@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -111,6 +111,7 @@ protected:
 	struct sockaddr_in m_SIN;
 	bool m_HasError;
 	int m_Error;
+	string m_CachedHostName;
 
 public:
 	CSocket( );
@@ -126,6 +127,7 @@ public:
 	virtual void SetFD( fd_set *fd, fd_set *send_fd, int *nfds );
 	virtual void Allocate( int type );
 	virtual void Reset( );
+	virtual string GetHostName( );
 };
 
 //

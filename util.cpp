@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -640,6 +640,11 @@ void UTIL_Replace( string &Text, string Key, string Value )
 		Text.replace( KeyStart, Key.size( ), Value );
 		KeyStart = Text.find( Key );
 	}
+}
+
+bool UTIL_IsNonPrintable( char c )
+{
+	return c < 32 || c >= 127;
 }
 
 vector<string> UTIL_Tokenize( string s, char delim )

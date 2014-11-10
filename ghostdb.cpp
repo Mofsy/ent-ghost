@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -68,6 +68,11 @@ bool CGHostDB :: AdminCheck( string server, string user )
 	return false;
 }
 
+bool CGHostDB :: AliasCheck( string ip )
+{
+	return false;
+}
+
 bool CGHostDB :: AdminAdd( string server, string user )
 {
 	return false;
@@ -88,7 +93,7 @@ uint32_t CGHostDB :: BanCount( string server )
 	return 0;
 }
 
-CDBBan *CGHostDB :: BanCheck( string server, string user, string ip )
+CDBBan *CGHostDB :: BanCheck( string server, string user, string ip, string hostname, string ownername )
 {
 	return NULL;
 }
@@ -108,24 +113,9 @@ bool CGHostDB :: BanRemove( string user, string context )
 	return false;
 }
 
-vector<CDBBan *> CGHostDB :: BanList( string server )
-{
-	return vector<CDBBan *>( );
-}
-
-vector<string> CGHostDB :: WhiteList( )
-{
-	return vector<string>( );
-}
-
 map<string, string> CGHostDB :: SpoofList( )
 {
 	return map<string, string>( );
-}
-
-vector<CDBBan *> CGHostDB :: BanListFast( string server, uint32_t banlistfasttime )
-{
-
 }
 
 void CGHostDB :: ReconUpdate( uint32_t hostcounter, uint32_t seconds )
@@ -133,19 +123,24 @@ void CGHostDB :: ReconUpdate( uint32_t hostcounter, uint32_t seconds )
 
 }
 
-vector<string> CGHostDB :: CommandList( )
-{
-	return vector<string>( );
-}
-
 uint32_t CGHostDB :: GameAdd( string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype )
 {
 	return 0;
 }
 
-string CGHostDB :: GameUpdate( string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalGames, uint32_t totalPlayers, bool add )
+uint32_t CGHostDB :: GameUpdate( uint32_t id, string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalPlayers, bool lobby, bool add )
 {
-	return "";
+	return 0;
+}
+
+void CGHostDB :: StreamGameUpdate( string gamename, string map, uint32_t mapcrc, uint32_t mapflags, uint32_t port )
+{
+
+}
+
+void CGHostDB :: StreamPlayerUpdate( string name, string gamename )
+{
+
 }
 
 uint32_t CGHostDB :: GamePlayerAdd( uint32_t gameid, string name, string ip, uint32_t spoofed, string spoofedrealm, uint32_t reserved, uint32_t loadingtime, uint32_t left, string leftreason, uint32_t team, uint32_t colour, string savetype )
@@ -199,6 +194,11 @@ CDBIslandPlayerSummary *CGHostDB :: IslandPlayerSummaryCheck( string name, strin
 }
 
 CDBShipsPlayerSummary *CGHostDB :: ShipsPlayerSummaryCheck( string name, string realm )
+{
+	return NULL;
+}
+
+CDBRVSPlayerSummary *CGHostDB :: RVSPlayerSummaryCheck( string name, string realm )
 {
 	return NULL;
 }
@@ -263,6 +263,11 @@ CCallableAdminCheck *CGHostDB :: ThreadedAdminCheck( string server, string user 
 	return NULL;
 }
 
+CCallableAliasCheck *CGHostDB :: ThreadedAliasCheck( string ip )
+{
+	return NULL;
+}
+
 CCallableAdminAdd *CGHostDB :: ThreadedAdminAdd( string server, string user )
 {
 	return NULL;
@@ -283,7 +288,7 @@ CCallableBanCount *CGHostDB :: ThreadedBanCount( string server )
 	return NULL;
 }
 
-CCallableBanCheck *CGHostDB :: ThreadedBanCheck( string server, string user, string ip )
+CCallableBanCheck *CGHostDB :: ThreadedBanCheck( string server, string user, string ip, string hostname, string ownername )
 {
 	return NULL;
 }
@@ -303,22 +308,7 @@ CCallableBanRemove *CGHostDB :: ThreadedBanRemove( string user, string context )
 	return NULL;
 }
 
-CCallableBanList *CGHostDB :: ThreadedBanList( string server )
-{
-	return NULL;
-}
-
-CCallableWhiteList *CGHostDB :: ThreadedWhiteList( )
-{
-	return NULL;
-}
-
 CCallableSpoofList *CGHostDB :: ThreadedSpoofList( )
-{
-	return NULL;
-}
-
-CCallableBanListFast *CGHostDB :: ThreadedBanListFast( string server, uint32_t banlistfasttime )
 {
 	return NULL;
 }
@@ -328,17 +318,22 @@ CCallableReconUpdate *CGHostDB :: ThreadedReconUpdate( uint32_t hostcounter, uin
 	return NULL;
 }
 
-CCallableCommandList *CGHostDB :: ThreadedCommandList( )
-{
-	return NULL;
-}
-
 CCallableGameAdd *CGHostDB :: ThreadedGameAdd( string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype )
 {
 	return NULL;
 }
 
-CCallableGameUpdate *CGHostDB :: ThreadedGameUpdate( string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalGames, uint32_t totalPlayers, bool add )
+CCallableGameUpdate *CGHostDB :: ThreadedGameUpdate( uint32_t id, string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalPlayers, bool lobby, bool add )
+{
+	return NULL;
+}
+
+CCallableStreamGameUpdate *CGHostDB :: ThreadedStreamGameUpdate( string gamename, string map, uint32_t mapcrc, uint32_t mapflags, uint32_t port )
+{
+	return NULL;
+}
+
+CCallableStreamPlayerUpdate *CGHostDB :: ThreadedStreamPlayerUpdate( string name, string gamename )
 {
 	return NULL;
 }
@@ -384,6 +379,11 @@ CCallableIslandPlayerSummaryCheck *CGHostDB :: ThreadedIslandPlayerSummaryCheck(
 }
 
 CCallableShipsPlayerSummaryCheck *CGHostDB :: ThreadedShipsPlayerSummaryCheck( string name, string realm )
+{
+	return NULL;
+}
+
+CCallableRVSPlayerSummaryCheck *CGHostDB :: ThreadedRVSPlayerSummaryCheck( string name, string realm )
 {
 	return NULL;
 }
@@ -483,6 +483,11 @@ CCallableAdminCheck :: ~CCallableAdminCheck( )
 
 }
 
+CCallableAliasCheck :: ~CCallableAliasCheck( )
+{
+
+}
+
 CCallableAdminAdd :: ~CCallableAdminAdd( )
 {
 
@@ -518,22 +523,7 @@ CCallableBanRemove :: ~CCallableBanRemove( )
 
 }
 
-CCallableBanList :: ~CCallableBanList( )
-{
-	// don't delete anything in m_Result here, it's the caller's responsibility
-}
-
-CCallableWhiteList :: ~CCallableWhiteList( )
-{
-	// don't delete anything in m_Result here, it's the caller's responsibility
-}
-
 CCallableSpoofList :: ~CCallableSpoofList( )
-{
-	// don't delete anything in m_Result here, it's the caller's responsibility
-}
-
-CCallableBanListFast :: ~CCallableBanListFast( )
 {
 	// don't delete anything in m_Result here, it's the caller's responsibility
 }
@@ -543,17 +533,22 @@ CCallableReconUpdate :: ~CCallableReconUpdate( )
 
 }
 
-CCallableCommandList :: ~CCallableCommandList( )
-{
-	// don't delete anything in m_Result here, it's the caller's responsibility
-}
-
 CCallableGameAdd :: ~CCallableGameAdd( )
 {
 
 }
 
 CCallableGameUpdate :: ~CCallableGameUpdate( )
+{
+
+}
+
+CCallableStreamGameUpdate :: ~CCallableStreamGameUpdate( )
+{
+
+}
+
+CCallableStreamPlayerUpdate :: ~CCallableStreamPlayerUpdate( )
 {
 
 }
@@ -599,6 +594,11 @@ CCallableIslandPlayerSummaryCheck :: ~CCallableIslandPlayerSummaryCheck( )
 }
 
 CCallableShipsPlayerSummaryCheck :: ~CCallableShipsPlayerSummaryCheck( )
+{
+	delete m_Result;
+}
+
+CCallableRVSPlayerSummaryCheck :: ~CCallableRVSPlayerSummaryCheck( )
 {
 	delete m_Result;
 }
@@ -850,6 +850,16 @@ CDBShipsPlayerSummary :: CDBShipsPlayerSummary( string nServer, string nName, ui
 }
 
 CDBShipsPlayerSummary :: ~CDBShipsPlayerSummary( )
+{
+
+}
+
+CDBRVSPlayerSummary :: CDBRVSPlayerSummary( string nServer, string nName, uint32_t nTotalGames, uint32_t nTotalWins, uint32_t nTotalLosses, uint32_t nTotalKills, double nScore ) : m_Server( nServer ), m_Name( nName ), m_TotalGames( nTotalGames ), m_TotalWins( nTotalWins ), m_TotalLosses( nTotalLosses ), m_TotalKills( nTotalKills ), m_Score( nScore )
+{
+
+}
+
+CDBRVSPlayerSummary :: ~CDBRVSPlayerSummary( )
 {
 
 }

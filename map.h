@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -134,6 +134,8 @@ private:
 	vector<uint32_t> m_TournamentLayout;		// tournament layout from config
 	vector<uint32_t> m_FakePlayers;				// fake players layout from config
 	string m_Conditions;						// win conditions, used for some stats processing
+	string m_GameName;
+	uint32_t m_StartPlayers;
 
 public:
 	CMap( CGHost *nGHost );
@@ -173,10 +175,13 @@ public:
 	vector<uint32_t> GetTournamentLayout( )	{ return m_TournamentLayout; }
 	vector<uint32_t> GetFakePlayers( )		{ return m_FakePlayers; }
 	string GetConditions( )					{ return m_Conditions; }
+	string GetGameName( )					{ return m_GameName; }
+	uint32_t GetStartPlayers( )				{ return m_StartPlayers; }
 
 	void Load( CConfig *CFG, string nCFGFile );
 	void CheckValid( );
 	uint32_t XORRotateLeft( unsigned char *data, uint32_t length );
+	void ForceAddObservers( );
 };
 
 #endif

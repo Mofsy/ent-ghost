@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -86,6 +86,7 @@ BYTEARRAY UTIL_DecodeStatString( BYTEARRAY &data );
 bool UTIL_IsLanIP( BYTEARRAY ip );
 bool UTIL_IsLocalIP( BYTEARRAY ip, vector<BYTEARRAY> &localIPs );
 void UTIL_Replace( string &Text, string Key, string Value );
+bool UTIL_IsNonPrintable( char c );
 vector<string> UTIL_Tokenize( string s, char delim );
 
 // math

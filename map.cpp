@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -791,6 +791,8 @@ void CMap :: Load( CConfig *CFG, string nCFGFile )
 
 	m_MapHeight = MapHeight;
 	m_MapType = CFG->GetString( "map_type", string( ) );
+	m_GameName = CFG->GetString( "map_gamename", string( ) );
+	m_StartPlayers = CFG->GetInt( "map_startplayers", 0 );
 	m_MapMatchMakingCategory = CFG->GetString( "map_matchmakingcategory", string( ) );
 	m_MapStatsW3MMDCategory = CFG->GetString( "map_statsw3mmdcategory", string( ) );
 	m_MapDefaultHCL = CFG->GetString( "map_defaulthcl", string( ) );
@@ -1012,4 +1014,17 @@ uint32_t CMap :: XORRotateLeft( unsigned char *data, uint32_t length )
 	}
 
 	return Val;
+}
+
+void CMap :: ForceAddObservers( )
+{
+	// force add observer slots
+
+	if( m_MapObservers != MAPOBS_ALLOWED && m_MapObservers != MAPOBS_REFEREES )
+	{
+		m_MapObservers = MAPOBS_REFEREES;
+
+		while( m_Slots.size( ) < 12 )
+			m_Slots.push_back( CGameSlot( 0, 255, SLOTSTATUS_OPEN, 0, 12, 12, SLOTRACE_RANDOM ) );
+	}
 }

@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -32,6 +32,9 @@ class CGameProtocol;
 class CGame;
 class CIncomingJoinPlayer;
 class CIncomingGarenaUser;
+class CCallableBanCheck;
+class CDBBan;
+class CStagePlayer;
 
 //
 // CPotentialPlayer
@@ -54,7 +57,9 @@ protected:
 	string m_ErrorString;
 	CIncomingJoinPlayer *m_IncomingJoinPlayer;
 	CIncomingGarenaUser *m_IncomingGarenaUser;
+	
 	bool m_Banned;
+	CCallableBanCheck *m_CallableBanCheck;
 
     uint32_t m_ConnectionState; // zero if no packets received (wait REQJOIN), one if only REQJOIN received (wait MAPSIZE), two otherwise
     uint32_t m_ConnectionTime;  // last time the player did something relating to connection state
@@ -89,6 +94,7 @@ public:
 	// other functions
 
 	virtual void Send( BYTEARRAY data );
+	virtual void SendBannedInfo( CDBBan *Ban, string type );
 };
 
 //
@@ -110,7 +116,6 @@ private:
 	uint32_t m_TotalPacketsSent;
 	uint32_t m_TotalPacketsReceived;
 	uint32_t m_LeftCode;						// the code to be sent in W3GS_PLAYERLEAVE_OTHERS for why this player left the game
-	uint32_t m_LoginAttempts;					// the number of attempts to login (used with CAdminGame only)
 	uint32_t m_Cookies;					// the number of cookies this user has, for the !cookie and !eat command
 	uint32_t m_SyncCounter;						// the number of keepalive packets received from this player
 	uint32_t m_JoinTime;						// GetTime when the player joined the game (used to delay sending the /whois a few seconds to allow for some lag)
@@ -121,13 +126,13 @@ private:
 	uint32_t m_FinishedLoadingTicks;			// GetTicks when the player finished loading the game
 	uint32_t m_StartedLaggingTicks;				// GetTicks when the player started lagging
 	uint32_t m_TotalLaggingTicks;				// total ticks that the player has been lagging in the game
+	uint32_t m_LastLaggingTicks;				// GetTicks when the player last stopped lagging
 	uint32_t m_StatsSentTime;					// GetTime when we sent this player's stats to the chat (to prevent players from spamming !stats)
 	uint32_t m_StatsDotASentTime;				// GetTime when we sent this player's dota stats to the chat (to prevent players from spamming !statsdota)
 	uint32_t m_KickVoteTime;					// GetTime when this player last requested a vote kick (!votekick)
 	uint32_t m_LastGProxyWaitNoticeSentTime;
 	queue<BYTEARRAY> m_LoadInGameData;			// queued data to be sent when the player finishes loading when using "load in game"
 	double m_Score;								// the player's generic "score" for the matchmaking algorithm
-	bool m_LoggedIn;							// if the player has logged in or not (used with CAdminGame only)
 	bool m_Spoofed;								// if the player has spoof checked or not
 	bool m_Reserved;							// if the player is reserved (VIP) or not
 	bool m_WhoisShouldBeSent;					// if a battle.net /whois should be sent for this player or not
@@ -140,7 +145,9 @@ private:
 	bool m_DropVote;							// if the player voted to drop the laggers or not (on the lag screen)
 	bool m_KickVote;							// if the player voted to kick a player or not
 	bool m_ForfeitVote;
+	uint32_t m_ForfeitVoteTime;
 	bool m_DrawVote;
+	uint32_t m_DrawVoteTime;
 	bool m_StartVote;							// if the player voted to start or not
 	bool m_Muted;								// if the player is muted or not
 	bool m_Autoban;								// whether or not this player should be consider for autobanning
@@ -156,10 +163,15 @@ private:
 	uint32_t m_LastGProxyAckTime;
 	vector<string> m_IgnoreList;				// list of usernames this player is ignoring
 	bool m_Fun;
+	bool m_AMHInitSent;							// whether AMH init has been sent
+	uint32_t m_LastAMHPingTime;				// last time we sent an AMH ping to the user
+	uint32_t m_LastAMHPongTime;				// last time we received an AMH pong from the user
+	queue<BYTEARRAY> m_NextAMHResponse;			// next expected AMH response(s) to receive; queue size is limited to 2
 
 public:
 	CGamePlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved );
 	CGamePlayer( CPotentialPlayer *potential, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved );
+	CGamePlayer( CStagePlayer *potential, CGameProtocol *nProtocol, CBaseGame *nGame, unsigned char nPID, string nJoinedRealm, string nName, BYTEARRAY nInternalIP, bool nReserved );
 	virtual ~CGamePlayer( );
 
 	unsigned char GetPID( )						{ return m_PID; }
@@ -174,7 +186,6 @@ public:
 	string GetJoinedRealm( )					{ return m_JoinedRealm; }
 	uint32_t GetCookies( )						{ return m_Cookies; }
 	uint32_t GetLeftCode( )						{ return m_LeftCode; }
-	uint32_t GetLoginAttempts( )				{ return m_LoginAttempts; }
 	uint32_t GetSyncCounter( )					{ return m_SyncCounter; }
 	uint32_t GetJoinTime( )						{ return m_JoinTime; }
 	uint32_t GetLastMapPartSent( )				{ return m_LastMapPartSent; }
@@ -184,13 +195,13 @@ public:
 	uint32_t GetFinishedLoadingTicks( )			{ return m_FinishedLoadingTicks; }
 	uint32_t GetStartedLaggingTicks( )			{ return m_StartedLaggingTicks; }
 	uint32_t GetTotalLaggingTicks( )			{ return m_TotalLaggingTicks; }
+	uint32_t GetLastLaggingTicks( )				{ return m_LastLaggingTicks; }
 	uint32_t GetStatsSentTime( )				{ return m_StatsSentTime; }
 	uint32_t GetStatsDotASentTime( )			{ return m_StatsDotASentTime; }
 	uint32_t GetKickVoteTime( )					{ return m_KickVoteTime; }
 	uint32_t GetLastGProxyWaitNoticeSentTime( )	{ return m_LastGProxyWaitNoticeSentTime; }
 	queue<BYTEARRAY> *GetLoadInGameData( )		{ return &m_LoadInGameData; }
 	double GetScore( )							{ return m_Score; }
-	bool GetLoggedIn( )							{ return m_LoggedIn; }
 	bool GetSpoofed( )							{ return m_Spoofed; }
 	bool GetReserved( )							{ return m_Reserved; }
 	bool GetWhoisShouldBeSent( )				{ return m_WhoisShouldBeSent; }
@@ -204,7 +215,9 @@ public:
 	bool GetKickVote( )							{ return m_KickVote; }
 	bool GetStartVote( )						{ return m_StartVote; }
 	bool GetForfeitVote( )						{ return m_ForfeitVote; }
+	uint32_t GetForfeitVoteTime( )				{ return m_ForfeitVoteTime; }
 	bool GetDrawVote( )							{ return m_DrawVote; }
+	uint32_t GetDrawVoteTime( )					{ return m_DrawVoteTime; }
 	bool GetMuted( )							{ return m_Muted; }
 	bool GetAutoban( )							{ return m_Autoban; }
 	bool GetLeftMessageSent( )					{ return m_LeftMessageSent; }
@@ -218,7 +231,6 @@ public:
 	void SetSpoofedRealm( string nSpoofedRealm )									{ m_SpoofedRealm = nSpoofedRealm; }
 	void SetLeftCode( uint32_t nLeftCode )											{ m_LeftCode = nLeftCode; }
 	void SetCookies( uint32_t nCookies )											{ m_Cookies = nCookies; }
-	void SetLoginAttempts( uint32_t nLoginAttempts )								{ m_LoginAttempts = nLoginAttempts; }
 	void SetSyncCounter( uint32_t nSyncCounter )									{ m_SyncCounter = nSyncCounter; }
 	void SetLastMapPartSent( uint32_t nLastMapPartSent )							{ m_LastMapPartSent = nLastMapPartSent; }
 	void SetLastMapPartAcked( uint32_t nLastMapPartAcked )							{ m_LastMapPartAcked = nLastMapPartAcked; }
@@ -226,12 +238,12 @@ public:
 	void SetFinishedDownloadingTime( uint32_t nFinishedDownloadingTime )			{ m_FinishedDownloadingTime = nFinishedDownloadingTime; }
 	void SetStartedLaggingTicks( uint32_t nStartedLaggingTicks )					{ m_StartedLaggingTicks = nStartedLaggingTicks; }
 	void SetTotalLaggingTicks( uint32_t nTotalLaggingTicks )						{ m_TotalLaggingTicks = nTotalLaggingTicks; }
+	void SetLastLaggingTicks( uint32_t nLastLaggingTicks )							{ m_LastLaggingTicks = nLastLaggingTicks; }
 	void SetStatsSentTime( uint32_t nStatsSentTime )								{ m_StatsSentTime = nStatsSentTime; }
 	void SetStatsDotASentTime( uint32_t nStatsDotASentTime )						{ m_StatsDotASentTime = nStatsDotASentTime; }
 	void SetKickVoteTime( uint32_t nKickVoteTime )									{ m_KickVoteTime = nKickVoteTime; }
 	void SetLastGProxyWaitNoticeSentTime( uint32_t nLastGProxyWaitNoticeSentTime )	{ m_LastGProxyWaitNoticeSentTime = nLastGProxyWaitNoticeSentTime; }
 	void SetScore( double nScore )													{ m_Score = nScore; }
-	void SetLoggedIn( bool nLoggedIn )												{ m_LoggedIn = nLoggedIn; }
 	void SetSpoofed( bool nSpoofed )												{ m_Spoofed = nSpoofed; }
 	void SetReserved( bool nReserved )												{ m_Reserved = nReserved; }
 	void SetWhoisShouldBeSent( bool nWhoisShouldBeSent )							{ m_WhoisShouldBeSent = nWhoisShouldBeSent; }
@@ -242,7 +254,9 @@ public:
 	void SetDropVote( bool nDropVote )												{ m_DropVote = nDropVote; }
 	void SetKickVote( bool nKickVote )												{ m_KickVote = nKickVote; }
 	void SetForfeitVote( bool nForfeitVote )										{ m_ForfeitVote = nForfeitVote; }
+	void SetForfeitVoteTime( uint32_t nForfeitVoteTime )							{ m_ForfeitVoteTime = nForfeitVoteTime; }
 	void SetDrawVote( bool nDrawVote )												{ m_DrawVote = nDrawVote; }
+	void SetDrawVoteTime( uint32_t nDrawVoteTime )									{ m_DrawVoteTime = nDrawVoteTime; }
 	void SetStartVote( bool nStartVote )											{ m_StartVote = nStartVote; }
 	void SetMuted( bool nMuted )													{ m_Muted = nMuted; m_MutedTicks = GetTicks( ); m_MutedAuto = false; }
 	void SetAutoban( bool nAutoban )												{ m_Autoban = nAutoban; }

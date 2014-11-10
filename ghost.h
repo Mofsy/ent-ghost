@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -37,24 +37,25 @@ class CTCPServer;
 class CTCPSocket;
 class CGPSProtocol;
 class CGCBIProtocol;
+class CAMHProtocol;
+class CGameProtocol;
+class CStreamPlayer;
+class CStagePlayer;
 class CCRC32;
 class CSHA1;
 class CBNET;
 class CBaseGame;
-class CAdminGame;
 class CGHostDB;
 class CBaseCallable;
 class CLanguage;
 class CMap;
 class CSaveGame;
 class CConfig;
-class CCallableCommandList;
-class CCallableGameUpdate;
-class CCallableBanList;
-class CCallableWhiteList;
 class CCallableSpoofList;
-class CDBBan;
 struct DenyInfo;
+struct GameCreateRequest;
+struct QueuedSpoofAdd;
+struct HostNameInfo;
 
 struct GProxyReconnector {
 	CTCPSocket *socket;
@@ -67,22 +68,25 @@ struct GProxyReconnector {
 class CGHost
 {
 public:
-	CUDPSocket *m_UDPSocket;				// a UDP socket for sending broadcasts and other junk (used with !sendlan)
+	vector<CUDPSocket *> m_UDPSockets;		// a UDP socket for sending broadcasts and other junk (used with !sendlan)
 	CUDPSocket *m_LocalSocket;				// a UDP socket for sending broadcasts and other junk (used with !sendlan)
 	CTCPServer *m_ReconnectSocket;			// listening socket for GProxy++ reliable reconnects
+	CTCPServer *m_StreamSocket;				// listening socket for streamers
 	vector<CTCPSocket *> m_ReconnectSockets;// vector of sockets attempting to reconnect (connected but not identified yet)
+	vector<CStreamPlayer *> m_StreamPlayers;// vector of stream players
+	vector<CStagePlayer *> m_StagePlayers;	// vector of players waiting for a game
 	vector<string> m_SlapPhrases;           // vector of phrases
 	CGPSProtocol *m_GPSProtocol;
 	CGCBIProtocol *m_GCBIProtocol;
+	CAMHProtocol *m_AMHProtocol;
+	CGameProtocol *m_GameProtocol;
 	CCRC32 *m_CRC;							// for calculating CRC's
 	CSHA1 *m_SHA;							// for calculating SHA1's
 	vector<CBNET *> m_BNETs;				// all our battle.net connections (there can be more than one)
 	CBaseGame *m_CurrentGame;				// this game is still in the lobby state
-	CAdminGame *m_AdminGame;				// this "fake game" allows an admin who knows the password to control the bot from the local network
 	vector<CBaseGame *> m_Games;			// these games are in progress
 	boost::mutex m_GamesMutex;
 	CGHostDB *m_DB;							// database
-	CGHostDB *m_DBLocal;					// local database (for temporary data)
 	vector<CBaseCallable *> m_Callables;	// vector of orphaned callables waiting to die
 	boost::mutex m_CallablesMutex;
 	vector<BYTEARRAY> m_LocalAddresses;		// vector of local IP addresses
@@ -90,8 +94,11 @@ public:
 	boost::mutex m_DenyMutex;
 	CLanguage *m_Language;					// language
 	CMap *m_Map;							// the currently loaded map
+	boost::mutex m_MapMutex;				// mutex to protect asynchronous map loading
+	GameCreateRequest *m_MapGameCreateRequest; // game create request after last asynchronous load completes
+	uint32_t m_MapGameCreateRequestTicks;
 	CMap *m_AdminMap;						// the map to use in the admin game
-	CMap *m_AutoHostMap;					// the map to use when autohosting
+	vector<CMap*> m_AutoHostMap;			// the maps to use when autohosting
 	CSaveGame *m_SaveGame;					// the save game to use
 	vector<PIDPlayer> m_EnforcePlayers;		// vector of pids to force players to use in the next game (used with saved games)
 	bool m_Exiting;							// set to true to force ghost to shutdown next update (used by SignalCatcher)
@@ -105,10 +112,6 @@ public:
 	uint32_t m_AutoHostMaximumGames;		// maximum number of games to auto host
 	uint32_t m_AutoHostAutoStartPlayers;	// when using auto hosting auto start the game when this many players have joined
 	uint32_t m_LastAutoHostTime;			// GetTime when the last auto host was attempted
-	uint32_t m_LastGameUpdateTime;			// GetTime when the gamelist was last updated
-	uint32_t m_LastCommandListTime;			// GetTime when last refreshed command list
-	CCallableCommandList *m_CallableCommandList;			// threaded database command list in progress
-    CCallableGameUpdate *m_CallableGameUpdate;// threaded database game update in progress
     bool m_AutoHostMatchMaking;
 	double m_AutoHostMinimumScore;
 	double m_AutoHostMaximumScore;
@@ -138,13 +141,13 @@ public:
 	bool m_RefreshMessages;					// config value: display refresh messages or not (by default)
 	bool m_AutoLock;						// config value: auto lock games when the owner is present
 	bool m_AutoSave;						// config value: auto save before someone disconnects
+	bool m_AMH;								// config value: whether LG-AMH is enabled on this bot
 	uint32_t m_AllowDownloads;				// config value: allow map downloads or not
 	bool m_PingDuringDownloads;				// config value: ping during map downloads or not
 	uint32_t m_MaxDownloaders;				// config value: maximum number of map downloaders at the same time
 	uint32_t m_MaxDownloadSpeed;			// config value: maximum total map download speed in KB/sec
 	bool m_LCPings;							// config value: use LC style pings (divide actual pings by two)
 	uint32_t m_AutoKickPing;				// config value: auto kick players with ping higher than this
-	uint32_t m_BanMethod;					// config value: ban method (ban by name/ip/both)
 	string m_IPBlackListFile;				// config value: IP blacklist file (ipblacklist.txt)
 	uint32_t m_LobbyTimeLimit;				// config value: auto close the game lobby after this many minutes without any reserved players
 	uint32_t m_Latency;						// config value: the latency (by default)
@@ -159,10 +162,6 @@ public:
 	string m_GameLoadedFile;				// config value: gameloaded.txt
 	string m_GameOverFile;					// config value: gameover.txt
 	bool m_LocalAdminMessages;				// config value: send local admin messages or not
-	bool m_AdminGameCreate;					// config value: create the admin game or not
-	uint16_t m_AdminGamePort;				// config value: the port to host the admin game on
-	string m_AdminGamePassword;				// config value: the admin game password
-	string m_AdminGameMap;					// config value: the admin game map config to use
 	unsigned char m_LANWar3Version;			// config value: LAN warcraft 3 version
 	uint32_t m_ReplayWar3Version;			// config value: replay warcraft 3 version (for saving replays)
 	uint32_t m_ReplayBuildNumber;			// config value: replay build number (for saving replays)
@@ -176,22 +175,26 @@ public:
     
     vector<string> m_FlameTriggers;			// triggers for antiflame system
     
-	vector<CDBBan *> m_BansConnect;			// bans not tied to other realms (entconnect realm)
-	vector<CDBBan *> m_BansGarena;			// bans not tied to other realms (lan/garena realm)
-	vector<string> m_WhiteList;				// entconnect whitelist
-    uint32_t m_LastBanRefreshTimeConnect;	// refresh ban list every 5 minutes
-    uint32_t m_LastBanRefreshTimeGarena;	// refresh ban list every 5 minutes
-    uint32_t m_LastWhiteListRefreshTime;	// refresh white list every 5 minutes
-	CCallableBanList *m_CallableBanListConnect;	// threaded database ban list in progress (entconnect)
-	CCallableBanList *m_CallableBanListGarena;	// threaded database ban list in progress (LAN/garena)
-	CCallableWhiteList *m_CallableWhiteList;	// threaded database white list in progress
-	boost::mutex m_BansMutex;
 	uint32_t m_LastDenyCleanTime;			// last time we cleaned the deny table
+	bool m_CloseSinglePlayer;				// whether to close games when there's only one player left
 	
 	boost::mutex m_SpoofMutex;
 	map<string, string> m_SpoofList; 		// donators can opt to spoof their name
 	uint32_t m_LastSpoofRefreshTime;		// refresh spoof list every 2 hours
 	CCallableSpoofList *m_CallableSpoofList; // spoof list refresh in progress
+	
+	bool m_Stream;							// whether streaming is enabled
+	uint32_t m_StreamPort;					// port to accept streamers on
+	uint32_t m_StreamLimit;					// seconds from beginning of game before players can stream
+	
+	bool m_Stage;
+	vector<CTCPSocket *> m_StageDoAdd;		// incoming connections to add to staging
+	boost::mutex m_StageMutex;				// mutex for the above vector
+	uint32_t m_LastStageTime;				// last time we tried to create a staging game
+	vector<QueuedSpoofAdd> m_DoSpoofAdd;	// pending spoof checks to process
+
+	deque<HostNameInfo> m_HostNameCache;	// host name lookup cache
+	boost::mutex m_HostNameCacheMutex;
 
 	CGHost( CConfig *CFG );
 	~CGHost( );
@@ -214,12 +217,9 @@ public:
 	void EventBNETEmote( CBNET *bnet, string user, string message );
 	void EventGameDeleted( CBaseGame *game );
 
-	CDBBan *IsBannedName( string name, string context, string realm );
-	bool IsWhiteList( string name );
-	CDBBan *IsBannedIP( string ip, string context );
-
 	// other functions
 
+	void ClearAutoHostMap( );
 	void ReloadConfigs( );
 	void SetConfigs( CConfig *CFG );
 	void ExtractScripts( );
@@ -231,12 +231,35 @@ public:
 	bool FlameCheck( string message );
 	string GetSpoofName( string name );
 	bool IsLocal( string ip );
+	
+	uint32_t CountStagePlayers( );
+	void BroadcastChat( string name, string message );
+
+	void AsynchronousMapLoad( CConfig *CFG, string nCFGFile );
+	void AsynchronousMapLoadHelper( CConfig *CFG, string nCFGFile );
+
+	string HostNameLookup( string ip );
 };
 
 struct DenyInfo {
 	uint32_t Time;
 	uint32_t Duration;
 	uint32_t Count;
+};
+
+struct GameCreateRequest {
+	unsigned char gameState;
+	bool saveGame;
+	string gameName;
+	string ownerName;
+	string creatorName;
+	string creatorServer;
+	bool whisper;
+};
+
+struct HostNameInfo {
+	string ip;
+	string hostname;
 };
 
 #endif

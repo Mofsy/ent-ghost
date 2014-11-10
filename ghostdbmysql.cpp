@@ -1,7 +1,7 @@
 /*
 
 	ent-ghost
-	Copyright [2011-2012] [Jack Lu]
+	Copyright [2011-2013] [Jack Lu]
 
 	This file is part of the ent-ghost source code.
 
@@ -22,8 +22,6 @@
 	GHost++ is Copyright [2008] [Trevor Hogan]
 
 */
-
-#ifdef GHOST_MYSQL
 
 #include "ghost.h"
 #include "util.h"
@@ -183,6 +181,19 @@ CCallableAdminCheck *CGHostDBMySQL :: ThreadedAdminCheck( string server, string 
 	return Callable;
 }
 
+CCallableAliasCheck *CGHostDBMySQL :: ThreadedAliasCheck( string ip )
+{
+	void *Connection = GetIdleConnection( );
+
+	if( !Connection )
+                ++m_NumConnections;
+
+	CCallableAliasCheck *Callable = new CMySQLCallableAliasCheck( ip, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CreateThread( Callable );
+        ++m_OutstandingCallables;
+	return Callable;
+}
+
 CCallableAdminAdd *CGHostDBMySQL :: ThreadedAdminAdd( string server, string user )
 {
 	void *Connection = GetIdleConnection( );
@@ -235,14 +246,14 @@ CCallableBanCount *CGHostDBMySQL :: ThreadedBanCount( string server )
 	return Callable;
 }
 
-CCallableBanCheck *CGHostDBMySQL :: ThreadedBanCheck( string server, string user, string ip )
+CCallableBanCheck *CGHostDBMySQL :: ThreadedBanCheck( string server, string user, string ip, string hostname, string ownername )
 {
 	void *Connection = GetIdleConnection( );
 
 	if( !Connection )
                 ++m_NumConnections;
 
-	CCallableBanCheck *Callable = new CMySQLCallableBanCheck( server, user, ip, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CCallableBanCheck *Callable = new CMySQLCallableBanCheck( server, user, ip, hostname, ownername, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
 	CreateThread( Callable );
         ++m_OutstandingCallables;
 	return Callable;
@@ -287,32 +298,6 @@ CCallableBanRemove *CGHostDBMySQL :: ThreadedBanRemove( string user, string cont
 	return Callable;
 }
 
-CCallableBanList *CGHostDBMySQL :: ThreadedBanList( string server )
-{
-	void *Connection = GetIdleConnection( );
-
-	if( !Connection )
-                ++m_NumConnections;
-
-	CCallableBanList *Callable = new CMySQLCallableBanList( server, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
-	CreateThread( Callable );
-        ++m_OutstandingCallables;
-	return Callable;
-}
-
-CCallableWhiteList *CGHostDBMySQL :: ThreadedWhiteList( )
-{
-	void *Connection = GetIdleConnection( );
-
-	if( !Connection )
-                ++m_NumConnections;
-
-	CCallableWhiteList *Callable = new CMySQLCallableWhiteList( Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
-	CreateThread( Callable );
-        ++m_OutstandingCallables;
-	return Callable;
-}
-
 CCallableSpoofList *CGHostDBMySQL :: ThreadedSpoofList( )
 {
 	void *Connection = GetIdleConnection( );
@@ -323,19 +308,6 @@ CCallableSpoofList *CGHostDBMySQL :: ThreadedSpoofList( )
 	CCallableSpoofList *Callable = new CMySQLCallableSpoofList( Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
 	CreateThread( Callable );
         ++m_OutstandingCallables;
-	return Callable;
-}
-
-CCallableBanListFast *CGHostDBMySQL :: ThreadedBanListFast( string server, uint32_t banlistfasttime )
-{
-	void *Connection = GetIdleConnection( );
-
-	if( !Connection )
-		++m_NumConnections;
-
-	CCallableBanListFast *Callable = new CMySQLCallableBanListFast( server, banlistfasttime, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
-	CreateThread( Callable );
-	++m_OutstandingCallables;
 	return Callable;
 }
 
@@ -352,19 +324,6 @@ CCallableReconUpdate *CGHostDBMySQL :: ThreadedReconUpdate( uint32_t hostcounter
 	return Callable;
 }
 
-CCallableCommandList *CGHostDBMySQL :: ThreadedCommandList( )
-{
-	void *Connection = GetIdleConnection( );
-
-	if( !Connection )
-                ++m_NumConnections;
-
-	CCallableCommandList *Callable = new CMySQLCallableCommandList( Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
-	CreateThread( Callable );
-        ++m_OutstandingCallables;
-	return Callable;
-}
-
 CCallableGameAdd *CGHostDBMySQL :: ThreadedGameAdd( string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype )
 {
 	void *Connection = GetIdleConnection( );
@@ -378,14 +337,40 @@ CCallableGameAdd *CGHostDBMySQL :: ThreadedGameAdd( string server, string map, s
 	return Callable;
 }
 
-CCallableGameUpdate *CGHostDBMySQL :: ThreadedGameUpdate( string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalGames, uint32_t totalPlayers, bool add )
+CCallableGameUpdate *CGHostDBMySQL :: ThreadedGameUpdate( uint32_t id, string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalPlayers, bool lobby, bool add )
 {
 	void *Connection = GetIdleConnection( );
 
 	if( !Connection )
                 ++m_NumConnections;
 
-	CCallableGameUpdate *Callable = new CMySQLCallableGameUpdate( map, gamename, ownername, creatorname, players, usernames, slotsTotal, totalGames, totalPlayers, add, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CCallableGameUpdate *Callable = new CMySQLCallableGameUpdate( id, map, gamename, ownername, creatorname, players, usernames, slotsTotal, totalPlayers, lobby, add, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CreateThread( Callable );
+        ++m_OutstandingCallables;
+	return Callable;
+}
+
+CCallableStreamGameUpdate *CGHostDBMySQL :: ThreadedStreamGameUpdate( string gamename, string map, uint32_t mapcrc, uint32_t mapflags, uint32_t port )
+{
+	void *Connection = GetIdleConnection( );
+
+	if( !Connection )
+                ++m_NumConnections;
+
+	CCallableStreamGameUpdate *Callable = new CMySQLCallableStreamGameUpdate( gamename, map, mapcrc, mapflags, port, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CreateThread( Callable );
+        ++m_OutstandingCallables;
+	return Callable;
+}
+
+CCallableStreamPlayerUpdate *CGHostDBMySQL :: ThreadedStreamPlayerUpdate( string name, string gamename )
+{
+	void *Connection = GetIdleConnection( );
+
+	if( !Connection )
+                ++m_NumConnections;
+
+	CCallableStreamPlayerUpdate *Callable = new CMySQLCallableStreamPlayerUpdate( name, gamename, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
 	CreateThread( Callable );
         ++m_OutstandingCallables;
 	return Callable;
@@ -516,6 +501,19 @@ CCallableShipsPlayerSummaryCheck *CGHostDBMySQL :: ThreadedShipsPlayerSummaryChe
                 ++m_NumConnections;
 
 	CCallableShipsPlayerSummaryCheck *Callable = new CMySQLCallableShipsPlayerSummaryCheck( name, realm, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
+	CreateThread( Callable );
+        ++m_OutstandingCallables;
+	return Callable;
+}
+
+CCallableRVSPlayerSummaryCheck *CGHostDBMySQL :: ThreadedRVSPlayerSummaryCheck( string name, string realm )
+{
+	void *Connection = GetIdleConnection( );
+
+	if( !Connection )
+                ++m_NumConnections;
+
+	CCallableRVSPlayerSummaryCheck *Callable = new CMySQLCallableRVSPlayerSummaryCheck( name, realm, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port, this );
 	CreateThread( Callable );
         ++m_OutstandingCallables;
 	return Callable;
@@ -804,6 +802,40 @@ bool MySQLAdminCheck( void *conn, string *error, uint32_t botid, string server, 
 	return IsAdmin;
 }
 
+string MySQLAliasCheck( void *conn, string *error, uint32_t botid, string ip )
+{
+	string EscIP = MySQLEscapeString( conn, ip );
+	string Aliases = "";
+	string Query = "SELECT DISTINCT name, spoofedrealm FROM gameplayers WHERE ip = '" + EscIP + "' ORDER BY id DESC LIMIT 4;";
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+		*error = mysql_error( (MYSQL *)conn );
+	else
+	{
+		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+
+		if( Result )
+		{
+			vector<string> Row = MySQLFetchRow( Result );
+
+			while( Row.size( ) == 2 )
+			{
+				Aliases += ", " + Row[0] + "@" + Row[1];
+				Row = MySQLFetchRow( Result );
+			}
+
+			mysql_free_result( Result );
+		}
+		else
+			*error = mysql_error( (MYSQL *)conn );
+	}
+
+	if( Aliases.length( ) < 3 )
+		return "No aliases found.";
+	else
+		return "Aliases: " + Aliases.substr( 2 );
+}
+
 bool MySQLAdminAdd( void *conn, string *error, uint32_t botid, string server, string user )
 {
 	transform( user.begin( ), user.end( ), user.begin( ), (int(*)(int))tolower );
@@ -897,19 +929,60 @@ uint32_t MySQLBanCount( void *conn, string *error, uint32_t botid, string server
 	return Count;
 }
 
-CDBBan *MySQLBanCheck( void *conn, string *error, uint32_t botid, string server, string user, string ip )
+CDBBan *MySQLBanCheck( void *conn, string *error, uint32_t botid, string server, string user, string ip, string hostname, string ownername )
 {
 	transform( user.begin( ), user.end( ), user.begin( ), (int(*)(int))tolower );
 	string EscServer = MySQLEscapeString( conn, server );
 	string EscUser = MySQLEscapeString( conn, user );
+	string EscUserServer = MySQLEscapeString( conn, user + "@" + server );
 	string EscIP = MySQLEscapeString( conn, ip );
-	CDBBan *Ban = NULL;
+	string EscHostName = MySQLEscapeString( conn, hostname );
+	string EscOwnerName = MySQLEscapeString( conn, ownername );
+	bool WhiteList = false;
 	string Query;
-
-	if( ip.empty( ) )
-		Query = "SELECT id, name, ip, date, gamename, admin, reason, expiredate, context FROM bans WHERE server='" + EscServer + "' AND name='" + EscUser + "'";
+	
+	if( server == "entconnect" )
+		Query = "SELECT name FROM whitelist WHERE name = '" + EscUser + "'";
 	else
-		Query = "SELECT id, name, ip, date, gamename, admin, reason, expiredate, context FROM bans WHERE (server='" + EscServer + "' AND name='" + EscUser + "') OR ip='" + EscIP + "'";
+		Query = "SELECT name FROM whitelist WHERE name = '" + EscUserServer + "'";
+
+	Query += " OR (LENGTH(name) >= 3 AND SUBSTR(name, 1, 1) = ':' AND LOCATE(name, ':" + EscIP + "') = 1)";
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+		*error = mysql_error( (MYSQL *)conn );
+	else
+	{
+		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+
+		if( Result )
+		{
+			vector<string> Row = MySQLFetchRow( Result );
+
+			if( Row.size( ) == 1 )
+				WhiteList = true;
+
+			mysql_free_result( Result );
+		}
+		else
+			*error = mysql_error( (MYSQL *)conn );
+	}
+	
+	CDBBan *Ban = NULL;
+	Query = "SELECT id, name, ip, date, gamename, admin, reason, expiredate, context FROM bans WHERE ( context = 'ttr.cloud' OR context = '" + EscOwnerName + "' ) AND (admin != 'autoban' OR processed = 1) AND (targetbot = 0 OR targetbot = " + UTIL_ToString( botid ) + ") AND ((server='" + EscServer + "' AND name='" + EscUser + "')";
+	
+	if( !ip.empty( ) && !WhiteList )
+	{
+		// first exact match
+		Query += " OR ip = '" + EscIP + "'";
+		
+		// also prefix partial
+		Query += " OR (LENGTH(ip) >= 3 AND SUBSTR(ip, 1, 1) = ':' AND LOCATE(SUBSTR(ip, 1), ':" + EscIP + "') > 0)";
+	}
+	
+	if( !hostname.empty( ) && !WhiteList )
+		Query += " OR (LENGTH(ip) >= 3 AND SUBSTR(ip, 1, 2) = ':h' AND LOCATE(SUBSTR(ip, 3), '" + EscHostName + "') > 0)";
+
+	Query += ") LIMIT 1";
 
 	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
 		*error = mysql_error( (MYSQL *)conn );
@@ -969,7 +1042,7 @@ bool MySQLBanRemove( void *conn, string *error, uint32_t botid, string server, s
 	string Query = "DELETE FROM bans WHERE server='" + EscServer + "' AND name='" + EscUser + "'";
 	
 	if( EscContext != "" && EscContext != "ttr.cloud" )
-		Query += " AND admin='" + EscContext + "'";
+		Query += " AND context='" + EscContext + "'";
 
 	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
 		*error = mysql_error( (MYSQL *)conn );
@@ -989,7 +1062,7 @@ bool MySQLBanRemove( void *conn, string *error, uint32_t botid, string user, str
 	string Query = "DELETE FROM bans WHERE name='" + EscUser + "'";
 	
 	if( EscContext != "" && EscContext != "ttr.cloud" )
-		Query += " AND admin='" + EscContext + "'";
+		Query += " AND context='" + EscContext + "'";
 
 	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
 		*error = mysql_error( (MYSQL *)conn );
@@ -997,76 +1070,6 @@ bool MySQLBanRemove( void *conn, string *error, uint32_t botid, string user, str
 		Success = true;
 
 	return Success;
-}
-
-vector<CDBBan *> MySQLBanList( void *conn, string *error, uint32_t botid, string server )
-{
-	vector<CDBBan *> BanList;
-	
-	// clear expired bans first
-	string ClearQuery = "DELETE FROM bans WHERE expiredate < NOW( )";
-	
-	if( mysql_real_query( (MYSQL *)conn, ClearQuery.c_str( ), ClearQuery.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-	else
-	{
-		string EscServer = MySQLEscapeString( conn, server );
-		string Query = "SELECT id, name, ip, date, gamename, admin, reason, expiredate, context FROM bans WHERE server='" + EscServer + "'";
-
-		if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-			*error = mysql_error( (MYSQL *)conn );
-		else
-		{
-			MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-
-			if( Result )
-			{
-				vector<string> Row = MySQLFetchRow( Result );
-
-				while( Row.size( ) == 9 )
-				{
-					BanList.push_back( new CDBBan( UTIL_ToUInt32( Row[0] ), server, Row[1], Row[2], Row[3], Row[4], Row[5], Row[6], Row[7], Row[8], 0 ) );
-					Row = MySQLFetchRow( Result );
-				}
-
-				mysql_free_result( Result );
-			}
-			else
-				*error = mysql_error( (MYSQL *)conn );
-		}
-	}
-
-	return BanList;
-}
-
-vector<string> MySQLWhiteList( void *conn, string *error, uint32_t botid )
-{
-	vector<string> WhiteList;
-	string Query = "SELECT name FROM whitelist";
-
-	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-	else
-	{
-		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-
-		if( Result )
-		{
-			vector<string> Row = MySQLFetchRow( Result );
-
-			while( Row.size( ) == 1 )
-			{
-				WhiteList.push_back( Row[0] );
-				Row = MySQLFetchRow( Result );
-			}
-
-			mysql_free_result( Result );
-		}
-		else
-			*error = mysql_error( (MYSQL *)conn );
-	}
-
-	return WhiteList;
 }
 
 map<string, string> MySQLSpoofList( void *conn, string *error, uint32_t botid )
@@ -1099,120 +1102,12 @@ map<string, string> MySQLSpoofList( void *conn, string *error, uint32_t botid )
 	return SpoofList;
 }
 
-vector<CDBBan *> MySQLBanListFast( void *conn, string *error, uint32_t botid, string server, uint32_t banlistfasttime )
-{
-	vector<CDBBan *> FastList;
-	string EscServer = MySQLEscapeString( conn, server );
-	
-	//find what to reset ban list fast time to
-	uint32_t NewBanListFastTime = banlistfasttime;
-	
-	//first, select the ones that should be added
-	string Query = "SELECT banid, bans.name, bans.ip, bans.date, bans.gamename, bans.admin, bans.reason, bans.expiredate, bans.context, UNIX_TIMESTAMP(bancache.datetime) FROM bancache LEFT JOIN bans ON bancache.banid = bans.id WHERE bans.server='" + EscServer + "' AND bancache.datetime >= FROM_UNIXTIME('" + UTIL_ToString( banlistfasttime ) + "') AND bancache.status = 0";
-
-	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-	else
-	{
-		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-
-		if( Result )
-		{
-			vector<string> Row = MySQLFetchRow( Result );
-
-			while( Row.size( ) == 10 )
-			{
-				uint32_t BanTime = UTIL_ToUInt32( Row[9] );
-				
-				if( BanTime > NewBanListFastTime )
-					NewBanListFastTime = BanTime;
-				
-				FastList.push_back( new CDBBan( UTIL_ToUInt32( Row[0] ), server, Row[1], Row[2], Row[3], Row[4], Row[5], Row[6], Row[7], Row[8], BanTime ) );
-				Row = MySQLFetchRow( Result );
-			}
-
-			mysql_free_result( Result );
-		}
-		else
-			*error = mysql_error( (MYSQL *)conn );
-	}
-	
-	//now, select the ones that should be deleted
-	// don't update new ban list fast time because we might miss some add-bans next time we go through cache
-	//additionally, we update OldBanListFastTime based on NewBanListFastTime if it has not been set yet
-	// this is so that we don't select EVERY deleted ban, ever
-	
-	if( banlistfasttime == 0 )
-		banlistfasttime = NewBanListFastTime - 3600;
-	
-	Query = "SELECT bancache.banid FROM bancache LEFT JOIN ban_history ON bancache.banid = ban_history.banid WHERE ban_history.server = '" + EscServer + "' AND bancache.datetime >= FROM_UNIXTIME('" + UTIL_ToString( banlistfasttime ) + "') AND bancache.status = 1";
-	
-	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-	else
-	{
-		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-
-		if( Result )
-		{
-			vector<string> Row = MySQLFetchRow( Result );
-
-			while( Row.size( ) == 1 )
-			{
-				FastList.push_back( new CDBBan( UTIL_ToUInt32( Row[0] ) ) );
-				Row = MySQLFetchRow( Result );
-			}
-
-			mysql_free_result( Result );
-		}
-		else
-			*error = mysql_error( (MYSQL *)conn );
-	}
-	
-	return FastList;
-}
-
 void MySQLReconUpdate( void *conn, string *error, uint32_t botid, uint32_t hostcounter,  uint32_t seconds )
 {
 	string Query = "UPDATE uxrecon_bots SET time = DATE_ADD(NOW(), INTERVAL " + UTIL_ToString( seconds ) + " SECOND), status = 1 WHERE botid = " + UTIL_ToString( botid ) + " AND bnet = " + UTIL_ToString( hostcounter );
 
 	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
 		*error = mysql_error( (MYSQL *)conn );
-}
-
-vector<string> MySQLCommandList( void *conn, string *error, uint32_t botid )
-{
-	vector<string> CommandList;
-	string Query = "SELECT command FROM commands WHERE botid='" + UTIL_ToString(botid) + "' ORDER BY id";
-
-	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-	else
-	{
-		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-
-		if( Result )
-		{
-			vector<string> Row = MySQLFetchRow( Result );
-
-			while( Row.size( ) == 1 )
-			{
-				CommandList.push_back( Row[0] );
-				Row = MySQLFetchRow( Result );
-			}
-
-			mysql_free_result( Result );
-		}
-		else
-			*error = mysql_error( (MYSQL *)conn );
-	}
-
-	string DeleteQuery = "DELETE FROM commands WHERE botid='" + UTIL_ToString(botid) + "'";
-
-	if( mysql_real_query( (MYSQL *)conn, DeleteQuery.c_str( ), DeleteQuery.size( ) ) != 0 )
-		*error = mysql_error( (MYSQL *)conn );
-
-	return CommandList;
 }
 
 uint32_t MySQLGameAdd( void *conn, string *error, uint32_t botid, string server, string map, string gamename, string ownername, uint32_t duration, uint32_t gamestate, string creatorname, string creatorserver, string savetype )
@@ -1240,62 +1135,175 @@ uint32_t MySQLGameAdd( void *conn, string *error, uint32_t botid, string server,
 	return RowID;
 }
 
-string MySQLGameUpdate( void *conn, string *error, uint32_t botid, string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalGames, uint32_t totalPlayers, bool add )
+uint32_t MySQLGameUpdate( void *conn, string *error, uint32_t botid, uint32_t id, string map, string gamename, string ownername, string creatorname, uint32_t players, string usernames, uint32_t slotsTotal, uint32_t totalPlayers, bool lobby, bool add )
 {
-	if(add) {
-        string EscMap = MySQLEscapeString(conn, map);
-        string EscGameName = MySQLEscapeString( conn, gamename );
-        string EscOwnerName = MySQLEscapeString( conn, ownername );
-        string EscCreatorName = MySQLEscapeString( conn, creatorname );
-        string EscUsernames = MySQLEscapeString( conn, usernames );
-        string Query = "UPDATE gamelist SET map = '" + EscMap + "', gamename = '" + EscGameName + "', ownername = '" + EscOwnerName + "', creatorname = '" + EscCreatorName + "', slotstaken = '" + UTIL_ToString(players) + "', slotstotal = '" + UTIL_ToString(slotsTotal) + "', usernames = '" + EscUsernames + "', totalgames = '" + UTIL_ToString(totalGames) + "', totalplayers = '" + UTIL_ToString(totalPlayers) + "' WHERE botid='" + UTIL_ToString(botid) + "'";
-        
-        if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-            *error = mysql_error( (MYSQL *)conn );
+	//housekeeping
+	string Query = "DELETE FROM gamelist WHERE age IS NULL OR age < DATE_SUB(NOW(), INTERVAL 5 MINUTE)";
+	mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) );
 
-        return "";
-    } else {
-        string Query = "SELECT gamename,slotstaken,slotstotal FROM gamelist";
-        
-        if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
-            *error = mysql_error( (MYSQL *)conn );
-        else
-            {
-                MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
-                string response = "Current games: ";
-                int num = 0;
-                
-                if( Result )
-                    {
-                        vector<string> Row = MySQLFetchRow( Result );
-                        
-                        while( !Row.empty( ) )
-                            {
-                                if(Row[0] != "") {
-                                    response += Row[0] + " (" + Row[1] + "/" + Row[2] + "), ";
-                                    num++;
-                                }
-                                
-                                Row = MySQLFetchRow( Result );
-                            }
-                        
-                        
-                        mysql_free_result( Result );
-                    }
-                else
-                    *error = mysql_error( (MYSQL *)conn );
-                
-                if(num == 0) {
-                    response += "none";
-                } else {
-                    response = response.substr(0, response.length() - 2);
-                }
+	string EscMap = MySQLEscapeString( conn, map );
+	string EscGameName = MySQLEscapeString( conn, gamename );
+	string EscOwnerName = MySQLEscapeString( conn, ownername );
+	string EscCreatorName = MySQLEscapeString( conn, creatorname );
+	string EscUsernames = MySQLEscapeString( conn, usernames );
+	
+	if( !add )
+	{
+		if( gamename.empty( ) )
+			Query = "DELETE FROM gamelist WHERE botid = " + UTIL_ToString( botid );
+		else if( id != 0 )
+			Query = "DELETE FROM gamelist WHERE id = '" + UTIL_ToString( id ) + "'";
+		else if( !EscGameName.empty( ) )
+			Query = "DELETE FROM gamelist WHERE gamename = '" + EscGameName + "'";
+		else
+			return 0;
+	}
+	else
+	{
+		Query = "INSERT INTO gamelist( botid, map, gamename, ownername, creatorname, slotstaken, slotstotal, usernames, totalplayers, lobby, age, eventtime) VALUES ( '" + UTIL_ToString( botid ) + "', '" + EscMap + "', '" + EscGameName + "', '" + EscOwnerName + "', '" + EscCreatorName + "', '" + UTIL_ToString( players ) + "', '" + UTIL_ToString( slotsTotal ) + "', '" + EscUsernames + "', '" + UTIL_ToString( totalPlayers ) + "', '" + ( lobby ? "1" : "0" ) + "', NOW( ), NOW( ) )";
 
-                return response;
-            }
+		if( id != 0 )
+		{
+			//confirm that the row exists
+			// also need to check if we're switching from lobby to ingame
+			string ExistQuery = "SELECT lobby FROM gamelist WHERE id = " + UTIL_ToString( id );
+			bool Exists = false;
 
-        return "";
-    }
+			if( mysql_real_query( (MYSQL *)conn, ExistQuery.c_str( ), ExistQuery.size( ) ) == 0 )
+			{
+				MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+		
+				if( Result )
+				{
+					vector<string> Row = MySQLFetchRow( Result );
+			
+					if( !Row.empty( ) )
+					{
+						Exists = true;
+						
+						if( Row[0] == "1" && !lobby )
+						{
+							Query = "UPDATE gamelist SET map = '" + EscMap + "', gamename = '" + EscGameName + "', ownername = '" + EscOwnerName + "', creatorname = '" + EscCreatorName + "', slotstaken = '" + UTIL_ToString( players ) + "', slotstotal = '" + UTIL_ToString( slotsTotal ) + "', usernames = '" + EscUsernames + "', totalplayers = '" + UTIL_ToString( totalPlayers ) + "', lobby = " + ( lobby ? "1" : "0" ) + ", age = NOW(), eventtime = NOW() WHERE botid='" + UTIL_ToString( botid ) + "' AND id = '" + UTIL_ToString( id ) + "'";
+						}
+						else
+						{
+							Query = "UPDATE gamelist SET map = '" + EscMap + "', gamename = '" + EscGameName + "', ownername = '" + EscOwnerName + "', creatorname = '" + EscCreatorName + "', slotstaken = '" + UTIL_ToString( players ) + "', slotstotal = '" + UTIL_ToString( slotsTotal ) + "', usernames = '" + EscUsernames + "', totalplayers = '" + UTIL_ToString( totalPlayers ) + "', lobby = " + ( lobby ? "1" : "0" ) + ", age = NOW() WHERE botid='" + UTIL_ToString( botid ) + "' AND id = '" + UTIL_ToString( id ) + "'";
+						}
+					}
+			
+					mysql_free_result( Result );
+				}
+			}
+			else
+			{
+				*error = mysql_error( (MYSQL *)conn );
+				return 0;
+			}
+
+			if( !Exists )
+				id = 0;
+		}
+	}
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+	{
+		*error = mysql_error( (MYSQL *)conn );
+		return 0;
+	}
+	
+	if( id == 0 )
+		return mysql_insert_id( (MYSQL *)conn );
+	else
+		return 0;
+}
+
+void MySQLStreamGameUpdate( void *conn, string *error, uint32_t botid, string gamename, string map, uint32_t mapcrc, uint32_t mapflags, uint32_t port )
+{
+	string EscGameName = MySQLEscapeString( conn, gamename );
+	string EscMap = MySQLEscapeString( conn, map );
+	string Query = "SELECT COUNT(*) FROM stream_games WHERE gamename = '" + EscGameName + "'";
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) == 0 )
+	{
+		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+		
+		if( Result )
+		{
+			vector<string> Row = MySQLFetchRow( Result );
+			
+			if( !Row.empty( ) )
+			{
+				if( Row[0] == "0" )
+				{
+					Query = "INSERT INTO stream_games (gamename, mappath, mapcrc, mapflags, port, botid, last_update) VALUES ('" + EscGameName + "', '" + EscMap + "', '" + UTIL_ToString( mapcrc ) + "', '" + UTIL_ToString( mapflags ) + "', '" + UTIL_ToString( port ) + "', '" + UTIL_ToString( botid ) + "', CURRENT_TIMESTAMP())";
+					
+					if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+						*error = mysql_error( (MYSQL *)conn );
+				}
+				else
+				{
+					string SetMap = ", mappath = '" + EscMap + "', mapcrc = '" + UTIL_ToString( mapcrc ) + "', mapflags = '" + UTIL_ToString( mapflags ) + "'";
+					
+					if( EscMap.empty( ) )
+						SetMap = "";
+					
+					Query = "UPDATE stream_games SET port = '" + UTIL_ToString( port ) + "', botid = '" + UTIL_ToString( botid ) + "'" + SetMap + ", last_update = CURRENT_TIMESTAMP() WHERE gamename = '" + EscGameName + "'";
+					
+					if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+						*error = mysql_error( (MYSQL *)conn );
+				}
+			}
+			
+			mysql_free_result( Result );
+		}
+	}
+	else
+		*error = mysql_error( (MYSQL *)conn );
+	
+	Query = "DELETE FROM stream_games WHERE last_update < DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 70 SECOND)";
+	mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) );
+}
+
+void MySQLStreamPlayerUpdate( void *conn, string *error, uint32_t botid, string name, string gamename )
+{
+	string EscName = MySQLEscapeString( conn, name );
+	string EscGameName = MySQLEscapeString( conn, gamename );
+	string Query = "SELECT COUNT(*) FROM stream_players WHERE name = '" + EscName + "'";
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) == 0 )
+	{
+		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+		
+		if( Result )
+		{
+			vector<string> Row = MySQLFetchRow( Result );
+			
+			if( !Row.empty( ) )
+			{
+				if( Row[0] == "0" )
+				{
+					Query = "INSERT INTO stream_players (name, gamename, last_update) VALUES ('" + EscName + "', '" + EscGameName + "', CURRENT_TIMESTAMP())";
+					
+					if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+						*error = mysql_error( (MYSQL *)conn );
+				}
+				else
+				{
+					Query = "UPDATE stream_players SET gamename = '" + EscGameName + "', last_update = CURRENT_TIMESTAMP() WHERE name = '" + EscName + "'";
+					
+					if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+						*error = mysql_error( (MYSQL *)conn );
+				}
+			}
+			
+			mysql_free_result( Result );
+		}
+	}
+	else
+		*error = mysql_error( (MYSQL *)conn );
+	
+	Query = "DELETE FROM stream_players WHERE last_update < DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 70 SECOND)";
+	mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) );
 }
 
 uint32_t MySQLGamePlayerAdd( void *conn, string *error, uint32_t botid, uint32_t gameid, string name, string ip, uint32_t spoofed, string spoofedrealm, uint32_t reserved, uint32_t loadingtime, uint32_t left, string leftreason, uint32_t team, uint32_t colour, string savetype )
@@ -1328,7 +1336,7 @@ CDBGamePlayerSummary *MySQLGamePlayerSummaryCheck( void *conn, string *error, ui
 	string EscName = MySQLEscapeString( conn, name );
 	string EscRealm = MySQLEscapeString( conn, realm );
 	CDBGamePlayerSummary *GamePlayerSummary = NULL;
-	string Query = "SELECT IFNULL(SUM(num_games), 0), (IFNULL(SUM(total_leftpercent), 1) / IFNULL(SUM(num_games), 1) * 100), ROUND(playingtime / 3600) FROM gametrack WHERE name='" + EscName + "'";
+	string Query = "SELECT IFNULL(SUM(num_games), 0), (IFNULL(SUM(total_leftpercent), 1) / IFNULL(SUM(num_games), 1) * 100), ROUND(SUM(playingtime) / 3600) FROM gametrack WHERE name='" + EscName + "'";
 	
 	if( !realm.empty( ) )
 		Query += " AND realm = '" + EscRealm + "'";
@@ -1898,6 +1906,51 @@ CDBShipsPlayerSummary *MySQLShipsPlayerSummaryCheck( void *conn, string *error, 
 	return ShipsPlayerSummary;
 }
 
+CDBRVSPlayerSummary *MySQLRVSPlayerSummaryCheck( void *conn, string *error, uint32_t botid, string name, string realm )
+{
+	transform( name.begin( ), name.end( ), name.begin( ), (int(*)(int))tolower );
+	string EscName = MySQLEscapeString( conn, name );
+	string EscRealm = MySQLEscapeString( conn, realm );
+	CDBRVSPlayerSummary *RVSPlayerSummary = NULL;
+	string Query = "SELECT IFNULL(SUM(games), 0), IFNULL(SUM(intstats0), 0), IFNULL(SUM(wins), 0), IFNULL(SUM(losses), 0), IFNULL(MAX(score), 0) FROM w3mmd_elo_scores WHERE name='" + EscName + "' AND category = 'rvs'";
+	
+	if( !realm.empty( ) )
+		Query += " AND server = '" + EscRealm + "'";
+
+	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
+		*error = mysql_error( (MYSQL *)conn );
+	else
+	{
+		MYSQL_RES *Result = mysql_store_result( (MYSQL *)conn );
+
+		if( Result )
+		{
+			vector<string> Row = MySQLFetchRow( Result );
+
+			if( Row.size( ) == 5 )
+			{
+				uint32_t TotalGames = UTIL_ToUInt32( Row[0] );
+				
+				if( TotalGames > 0 )
+				{
+					uint32_t TotalWins = UTIL_ToUInt32( Row[2] );
+					uint32_t TotalLosses = UTIL_ToUInt32( Row[3] );
+					uint32_t TotalKills = UTIL_ToUInt32( Row[1] );
+					double Score = UTIL_ToDouble( Row[4] );
+
+					RVSPlayerSummary = new CDBRVSPlayerSummary( realm, name, TotalGames, TotalWins, TotalLosses, TotalKills, Score );
+				}
+			}
+
+			mysql_free_result( Result );
+		}
+		else
+			*error = mysql_error( (MYSQL *)conn );
+	}
+
+	return RVSPlayerSummary;
+}
+
 CDBSnipePlayerSummary *MySQLSnipePlayerSummaryCheck( void *conn, string *error, uint32_t botid, string name, string realm )
 {
 	transform( name.begin( ), name.end( ), name.begin( ), (int(*)(int))tolower );
@@ -2028,28 +2081,51 @@ double *MySQLScoreCheck( void *conn, string *error, uint32_t botid, string categ
 	
 	if( category == "dota2" ) // dota2 checks normal DotA stats
 	{
-		Query = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 20";
-		Query2 = "SELECT score FROM dota2_elo_scores WHERE name = '" + EscName + "' AND server='" + EscServer + "'";
+		//Query = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 20";
+		//Query2 = "SELECT score FROM dota2_elo_scores WHERE name = '" + EscName + "' AND server='" + EscServer + "'";
+		Query = "SELECT dota_elo_scores.score FROM dota_elo_scores, gametrack WHERE dota_elo_scores.name='" + EscName + "' AND dota_elo_scores.server='" + EscServer + "' AND gametrack.name = dota_elo_scores.name AND gametrack.realm = dota_elo_scores.server AND dota_elo_scores.wins >= 20 AND ( (total_leftpercent / num_games)*100 > 90 OR (num_autoban / num_games)*100 < 5)";
+		Query2 = "SELECT -100000.0;";
 	}
 	else if( category == "castlefight2" ) // castlefight2 checks castlefight stats
 	{
 		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='castlefight' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 15";
 		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='castlefight2' AND name='" + EscName + "' AND server='" + EscServer + "'";
 	}
-	else if( category == "legionmega2" ) // legionmega2 checks legion mega stats
+	else if( category == "legionmegaone2" ) // legionmegaone2 is really legionmegaone but with score restrictoin
 	{
-		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 15";
-		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega2' AND name='" + EscName + "' AND server='" + EscServer + "'";
+		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmegaone' AND name='" + EscName + "' AND server='" + EscServer + "'";
+		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmegaone' AND name='" + EscName + "' AND server='" + EscServer + "'";
 	}
 	else if( category == "dota" )
 	{
-		Query = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
-		Query2 = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
+		Query = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 5";
+		Query2 = "SELECT score FROM dota_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 5";
+	}
+	else if( category == "lod" )
+	{
+		Query = "SELECT score FROM lod_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
+		Query2 = "SELECT score FROM lod_elo_scores WHERE name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
 	}
 	else if( category == "legionmega" )
 	{
-		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
-		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 10";
+		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 5";
+		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='legionmega' AND name='" + EscName + "' AND server='" + EscServer + "' AND wins >= 5";
+	}
+	else if( category == "cfone" )
+	{
+		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='cfone' AND name='" + EscName + "' AND server='" + EscServer + "'";
+		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='cfone' AND name='" + EscName + "' AND server='" + EscServer + "'";
+	}
+	else if( category == "nwuih" )
+	{
+		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='nwuih' AND name='" + EscName + "' AND server='" + EscServer + "'";
+		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='nwuih' AND name='" + EscName + "' AND server='" + EscServer + "'";
+	}
+	else if( category == "battleships" )
+	{
+		Score[0] = 1000.0;
+		Query = "SELECT score FROM w3mmd_elo_scores WHERE category='battleships' AND name='" + EscName + "' AND server='" + EscServer + "'";
+		Query2 = "SELECT score FROM w3mmd_elo_scores WHERE category='battleships' AND name='" + EscName + "' AND server='" + EscServer + "'";
 	}
 	else
 		CONSOLE_Print( "[MYSQL] Requested score check on invalid category: " + category );
@@ -2503,7 +2579,7 @@ void CMySQLCallable :: Init( )
 		// try again to get idle connection
 		for( unsigned int i = 0; i < 3 && !m_Connection; i++ )
 		{
-			CONSOLE_Print( "[MYSQL] No connection yet, trying again (" + UTIL_ToString( i + 1 ) + ")" );
+			//CONSOLE_Print( "[MYSQL] No connection yet, trying again (" + UTIL_ToString( i + 1 ) + ")" );
 			MILLISLEEP( rand() % 1000 + 300 );
 			m_Connection = m_DB->GetIdleConnection( );
 		}
@@ -2548,6 +2624,16 @@ void CMySQLCallableAdminCheck :: operator( )( )
 
 	if( m_Error.empty( ) )
 		m_Result = MySQLAdminCheck( m_Connection, &m_Error, m_SQLBotID, m_Server, m_User );
+
+	Close( );
+}
+
+void CMySQLCallableAliasCheck :: operator( )( )
+{
+	Init( );
+
+	if( m_Error.empty( ) )
+		m_Result = MySQLAliasCheck( m_Connection, &m_Error, m_SQLBotID, m_IP );
 
 	Close( );
 }
@@ -2597,7 +2683,7 @@ void CMySQLCallableBanCheck :: operator( )( )
 	Init( );
 
 	if( m_Error.empty( ) )
-		m_Result = MySQLBanCheck( m_Connection, &m_Error, m_SQLBotID, m_Server, m_User, m_IP );
+		m_Result = MySQLBanCheck( m_Connection, &m_Error, m_SQLBotID, m_Server, m_User, m_IP, m_HostName, m_OwnerName );
 
 	Close( );
 }
@@ -2627,26 +2713,6 @@ void CMySQLCallableBanRemove :: operator( )( )
 	Close( );
 }
 
-void CMySQLCallableBanList :: operator( )( )
-{
-	Init( );
-
-	if( m_Error.empty( ) )
-		m_Result = MySQLBanList( m_Connection, &m_Error, m_SQLBotID, m_Server );
-
-	Close( );
-}
-
-void CMySQLCallableWhiteList :: operator( )( )
-{
-	Init( );
-
-	if( m_Error.empty( ) )
-		m_Result = MySQLWhiteList( m_Connection, &m_Error, m_SQLBotID );
-
-	Close( );
-}
-
 void CMySQLCallableSpoofList :: operator( )( )
 {
 	Init( );
@@ -2657,32 +2723,12 @@ void CMySQLCallableSpoofList :: operator( )( )
 	Close( );
 }
 
-void CMySQLCallableBanListFast :: operator( )( )
-{
-	Init( );
-
-	if( m_Error.empty( ) )
-		m_Result = MySQLBanListFast( m_Connection, &m_Error, m_SQLBotID, m_Server, m_BanListFastTime );
-
-	Close( );
-}
-
 void CMySQLCallableReconUpdate :: operator( )( )
 {
 	Init( );
 
 	if( m_Error.empty( ) )
 		MySQLReconUpdate( m_Connection, &m_Error, m_SQLBotID, m_HostCounter, m_Seconds );
-
-	Close( );
-}
-
-void CMySQLCallableCommandList :: operator( )( )
-{
-	Init( );
-
-	if( m_Error.empty( ) )
-		m_Result = MySQLCommandList( m_Connection, &m_Error, m_SQLBotID );
 
 	Close( );
 }
@@ -2702,7 +2748,27 @@ void CMySQLCallableGameUpdate :: operator( )( )
 	Init( );
 
 	if( m_Error.empty( ) )
-		m_Result = MySQLGameUpdate( m_Connection, &m_Error, m_SQLBotID, m_Map, m_GameName, m_OwnerName, m_CreatorName, m_Players, m_Usernames, m_SlotsTotal, m_TotalGames, m_TotalPlayers, m_Add );
+		m_Result = MySQLGameUpdate( m_Connection, &m_Error, m_SQLBotID, m_ID, m_Map, m_GameName, m_OwnerName, m_CreatorName, m_Players, m_Usernames, m_SlotsTotal, m_TotalPlayers, m_Lobby, m_Add );
+
+	Close( );
+}
+
+void CMySQLCallableStreamGameUpdate :: operator( )( )
+{
+	Init( );
+
+	if( m_Error.empty( ) )
+		MySQLStreamGameUpdate( m_Connection, &m_Error, m_SQLBotID, m_GameName, m_Map, m_MapCRC, m_MapFlags, m_Port );
+
+	Close( );
+}
+
+void CMySQLCallableStreamPlayerUpdate :: operator( )( )
+{
+	Init( );
+
+	if( m_Error.empty( ) )
+		MySQLStreamPlayerUpdate( m_Connection, &m_Error, m_SQLBotID, m_Name, m_GameName );
 
 	Close( );
 }
@@ -2803,6 +2869,16 @@ void CMySQLCallableShipsPlayerSummaryCheck :: operator( )( )
 
 	if( m_Error.empty( ) )
 		m_Result = MySQLShipsPlayerSummaryCheck( m_Connection, &m_Error, m_SQLBotID, m_Name, m_Realm );
+
+	Close( );
+}
+
+void CMySQLCallableRVSPlayerSummaryCheck :: operator( )( )
+{
+	Init( );
+
+	if( m_Error.empty( ) )
+		m_Result = MySQLRVSPlayerSummaryCheck( m_Connection, &m_Error, m_SQLBotID, m_Name, m_Realm );
 
 	Close( );
 }
@@ -2923,5 +2999,3 @@ void CMySQLCallableW3MMDVarAdd :: operator( )( )
 
 	Close( );
 }
-
-#endif
